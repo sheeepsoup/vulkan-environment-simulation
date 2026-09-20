@@ -9,15 +9,21 @@
 #include"lve_camera.h"
 #include"lve_compute.h"
 #include"lve_terrain.h"
+#include "shadow.h"
 namespace lve {
 	class LveRenderer {
 	public:
 		void createCommandBuffers(VkDevice device, VkCommandPool commandPool, uint32_t commandBufferCount);
 		void createSignalSemaphore(VkDevice device, uint32_t swapChainImageCount);
+		/*renderPrarams里面的参数单纯是表示各种微调shader的数值[imgui里] x是bias
+		* 
+		* 
+		* 
+		*/
 		void run(VkDevice device, LveSwapChain& swapChain, VkQueue graphicsQueue, VkQueue presentQueue, uint32_t& currentFrame,
 			VkRenderPass &renderPass, LveModel& model, const std::vector<VkDescriptorSet> descriptorSets, VkPipelineLayout pipelineLayout, LveUniform &uniform,
 			const glm::mat4 modelMatirx, const glm::mat4 view, const glm::mat4 proj, LveCompute& compute, glm::vec3 cameraPos, std::vector<uint32_t>& indices,
-			LveTerrain& terrain,float renderDistance);
+			LveTerrain& terrain,float renderDistance, shadow::Shadow& shadow, const glm::mat4& lightViewProj, glm::vec4 renderParams);
 		uint32_t getImageIndex() { return imageIndex; };
 		uint32_t getMaxFramesInFlight() { return MAX_FRAMES_IN_FLIGHT; };
 		void clean(VkDevice device);
@@ -35,7 +41,7 @@ namespace lve {
 		void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, VkRenderPass renderPass,
 			VkFramebuffer framebuffer, VkExtent2D extent, LveModel& model, VkPipelineLayout pipelineLayout, uint32_t currentFrame,
 			const std::vector<VkDescriptorSet> descriptorSets, LveCompute& compute, std::vector<uint32_t>& indices, LveTerrain& terrain,
-			float renderDistance, glm::vec3 cameraPos);
+			float renderDistance, glm::vec3 cameraPos, shadow::Shadow& shadow, const glm::mat4& lightViewProj);
 	};
 
 }

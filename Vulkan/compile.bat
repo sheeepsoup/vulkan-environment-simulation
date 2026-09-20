@@ -16,7 +16,9 @@ echo Removing UTF-8 BOM...
 for %%F in (
     "shader\simple_shader.vert"
     "shader\simple_shader.frag"
-    "shader\compute.comp"     
+    "shader\compute.comp"
+    "shader\slope.comp"
+    "shader\shadow.vert"
 ) do (
     powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
     "$path = [IO.Path]::GetFullPath('%%~F');" ^
@@ -40,8 +42,16 @@ echo Compiling fragment shader...
 "%GLSLC%" "shader\simple_shader.frag" -o "shader\simple_shader.frag.spv"
 if errorlevel 1 goto compile_failed
 
-echo Compiling compute shader...  
+echo Compiling compute shader...
 "%GLSLC%" "shader\compute.comp" -o "shader\compute.comp.spv"
+if errorlevel 1 goto compile_failed
+
+echo Compiling slope compute shader...
+"%GLSLC%" "shader\slope.comp" -o "shader\slope.comp.spv"
+if errorlevel 1 goto compile_failed
+
+echo Compiling shadow vertex shader...
+"%GLSLC%" "shader\shadow.vert" -o "shader\shadow.vert.spv"
 if errorlevel 1 goto compile_failed
 
 echo.

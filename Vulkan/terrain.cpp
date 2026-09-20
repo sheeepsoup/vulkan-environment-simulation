@@ -140,7 +140,8 @@ namespace lve {
 		//清理顶点
 		vertices.clear();
 		indices.clear();
-		
+		renderChunks.clear();
+
 		initNoise(seed);//初始化噪声
 		const int chunkCount = 2 * BlockNum - 1;
 		const int mapVertexCount = chunkCount * (BlockVertexNum - 1) + 1;
@@ -326,7 +327,8 @@ namespace lve {
 		float oceanFloor = -8.0f;//海底
 		float landBase = 2.0f;//基础高度
 		const float baseHeight = glm::mix(oceanFloor,landBase,landMask);//对应的海洋地形
-		const float finalHeight = baseHeight + terrainShape * landMask;
+//		const float finalHeight = baseHeight + terrainShape * landMask;
+		const float finalHeight = terrainShape * landMask;
 		return finalHeight + detailValue * detailStrength;
 	}
 	glm::vec3 LveTerrain::calculateNormal(float worldX, float worldY, float sampleDistance) {
@@ -605,7 +607,7 @@ namespace lve {
 
 
 		//更新顶点高度
-		for (int i = 0; i < vertices.size(); i++) {
+		for (size_t i = 0; i < heightUint.size(); i++) {
 			vertices[i].pos.z = heightUint[i] / SCALE;
 			heightData[i] = static_cast<float>(heightUint[i]) / SCALE;
 		}
@@ -651,5 +653,10 @@ namespace lve {
 	}
 	void LveTerrain::drawOcean(VkCommandBuffer commandBuffer) {
 		vkCmdDrawIndexed(commandBuffer, ocean.oceanIndexCount, 1, ocean.oceanFirstIndex, 0, 0);
+	}
+	void LveTerrain::drawAllChunks(VkCommandBuffer commandBuffer) {
+		for (const auto& chunk : renderChunks) {
+			vkCmdDrawIndexed(commandBuffer, chunk.indexCount, 1, chunk.firstIndex, 0, 0);
+		}
 	}
 }

@@ -54,12 +54,30 @@ namespace lve {
 		vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 	}
 	void LveModel::clean(VkDevice device) {
-		vkDestroyBuffer(device, vertexBuffer, nullptr);
-		vkFreeMemory(device, vertexBufferMemory, nullptr);
-		vkDestroyBuffer(device, stagingBuffer, nullptr);
-		vkFreeMemory(device, stagingBufferMemory, nullptr);
-		vkDestroyBuffer(device, indexBuffer, nullptr);
-		vkFreeMemory(device, indexBufferMemory, nullptr);
+		if (vertexBuffer != VK_NULL_HANDLE) {
+			vkDestroyBuffer(device, vertexBuffer, nullptr);
+			vertexBuffer = VK_NULL_HANDLE;
+		}
+		if (vertexBufferMemory != VK_NULL_HANDLE) {
+			vkFreeMemory(device, vertexBufferMemory, nullptr);
+			vertexBufferMemory = VK_NULL_HANDLE;
+		}
+		if (stagingBuffer != VK_NULL_HANDLE) {
+			vkDestroyBuffer(device, stagingBuffer, nullptr);
+			stagingBuffer = VK_NULL_HANDLE;
+		}
+		if (stagingBufferMemory != VK_NULL_HANDLE) {
+			vkFreeMemory(device, stagingBufferMemory, nullptr);
+			stagingBufferMemory = VK_NULL_HANDLE;
+		}
+		if (indexBuffer != VK_NULL_HANDLE) {
+			vkDestroyBuffer(device, indexBuffer, nullptr);
+			indexBuffer = VK_NULL_HANDLE;
+		}
+		if (indexBufferMemory != VK_NULL_HANDLE) {
+			vkFreeMemory(device, indexBufferMemory, nullptr);
+			indexBufferMemory = VK_NULL_HANDLE;
+		}
 	}
 
 	void LveModel::createIndexBufferWithStaging(LveDevice& lveDevice,std::vector<uint32_t> &indices) {

@@ -1,0 +1,74 @@
+#version 450
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(binding = 0) buffer HeightBuffer {
+    int heights_int[];
+};
+
+layout(binding = 1) buffer SlopeBuffer {
+    float slope[];
+};
+
+layout(push_constant) uniform PushConstants {
+    int mapVertexCount;   // 高度图边长（顶点数）
+    int slopeRes;         // 坡度图边长
+    float step;           // 高度图顶点间距
+    float padding;
+} pc;
+
+const float SCALE = 10000.0;
+
+// 按坡度图像素 -> 世界坐标 -> 高度图浮点坐标，双线性采样
+float sampleHeight(float fx, float fy) {
+    int w = pc.mapVertexCount;
+
+    int x0 = int(floor(fx));
+    int y0 = int(floor(fy));
+    int x1 = min(x0 + 1, w - 1);
+    int y1 = min(y0 + 1, w - 1);
+    x0 = clamp(x0, 0, w - 1);
+    y0 = clamp(y0, 0, w - 1);
+
+    float tx = fx - float(x0);
+    float ty = fy - float(y0);
+
+    float h00 = float(heights_int[y0 * w + x0]) / SCALE;
+    float h10 = float(heights_int[y0 * w + x1]) / SCALE;
+    float h01 = float(heights_int[y1 * w + x0]) / SCALE;
+    float h11 = float(heights_int[y1 * w + x1]) / SCALE;
+
+    return mix(mix(h00, h10, tx), mix(h01, h11, tx), ty);
+}
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= pc.slopeRes || pixel.y >= pc.slopeRes) return;
+
+    // 坡度图像素中心 -> 世界坐标
+    float worldX = (float(pixel.x) + 0.5) / float(pc.slopeRes)
+                 * float(pc.mapVertexCount) * pc.step;
+    float worldY = (float(pixel.y) + 0.5) / float(pc.slopeRes)
+                 * float(pc.mapVertexCount) * pc.step;
+
+    // 世界坐标 -> 高度图浮点坐标
+    float fx = worldX / pc.step;
+    float fy = worldY / pc.step;
+
+    // 坡度图像素间距对应的世界距离
+    float worldStep = float(pc.mapVertexCount) * pc.step / float(pc.slopeRes);
+    float hStep = worldStep / pc.step;
+
+    // 中心差分
+    float hL = sampleHeight(fx - hStep, fy);
+    float hR = sampleHeight(fx + hStep, fy);
+    float hD = sampleHeight(fx, fy - hStep);
+    float hU = sampleHeight(fx, fy + hStep);
+
+    float dx = (hR - hL) / (2.0 * worldStep);
+    float dy = (hU - hD) / (2.0 * worldStep);
+
+    float gradMag = sqrt(dx * dx + dy * dy);
+
+    uint index = uint(pixel.y * pc.slopeRes + pixel.x);
+    slope[index] = gradMag;
+}

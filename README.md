@@ -24,7 +24,7 @@ Currently completed: terrain generation and hydraulic erosion simulation. More e
 ## ✨ Current Features
 
 - 🏔️ **Procedural Terrain Generation** — Multi-layer noise blending based on FastNoiseLite for highly detailed terrain
-- 💧 **GPU Hydraulic Erosion Simulation** — Compute shader parallel simulation with 1 million water droplets, creating natural gullies and sediment deposits
+- 💧 **GPU Hydraulic Erosion Simulation** — Compute shader simulation with 200,000 droplets, creating natural gullies and sediment deposits
 - 🎨 **Intelligent Texture Blending** — Automatically blends grass/dirt/rock/snow based on slope, height, normal direction, and water flow
 - 🌫️ **Atmospheric Fog** — Distance-based fog rendering for enhanced scene depth
 - 🖱️ **Free Camera Control** — WASD movement + mouse rotation for full 3D observation
@@ -40,6 +40,14 @@ Currently completed: terrain generation and hydraulic erosion simulation. More e
 > Erosion-simulated terrain generation
 > Unique terrain texture algorithm
 
+### 🧪 Latest Research Update
+
+The erosion shader now tracks how many droplets have affected each terrain location. When erosion accumulates too heavily in the same area, subsequent droplets can exit early. This avoids excessive droplet accumulation and redundant computation on flat terrain.
+
+- **Before:** `4.886600 s`
+- **After:** `3.95707 s`
+- **Improvement:** approximately `19%` faster GPU erosion
+
 ---
 
 ### Key Milestones
@@ -47,7 +55,7 @@ Currently completed: terrain generation and hydraulic erosion simulation. More e
 - **Phase 1**: Basic Vulkan setup (SDL3 + Vulkan), simple triangle rendering
 - **Phase 2**: Terrain generation with FastNoiseLite, multi-layer noise blending
 - **Phase 3**: CPU-based hydraulic erosion (later replaced by GPU version)
-- **Phase 4**: GPU compute shader erosion with 1 million parallel droplets
+- **Phase 4**: GPU compute shader erosion with parallel droplet simulation
 - **Phase 5**: Advanced texture blending based on slope, height, and water flow
 - **Phase 6**: (Planned) Infinite terrain chunk loading
 
@@ -97,7 +105,7 @@ Currently completed: terrain generation and hydraulic erosion simulation. More e
 
 ## ✨ 当前功能
 - 🏔️ **程序化地形生成** — 基于 FastNoiseLite 的多层噪声叠加，生成高细节地形
-- 💧 **GPU 水力侵蚀模拟** — 计算着色器并行模拟 100 万水滴，形成自然沟壑与沉积
+- 💧 **GPU 水力侵蚀模拟** — 计算着色器并行模拟 20 万水滴，形成自然沟壑与沉积
 - 🎨 **智能纹理混合** — 根据坡度、高度、法线方向和水流流量，自动混合草地/泥土/岩石/雪地
 - 🌫️ **环境雾效** — 基于距离的雾效渲染，增强场景层次感
 - 🖱️ **自由摄像机控制** — WASD 移动 + 鼠标旋转，全方位观察地形
@@ -109,12 +117,20 @@ Currently completed: terrain generation and hydraulic erosion simulation. More e
 > 侵蚀模拟的地形生成
 > 独特的地形纹理算法
 
+### 🧪 最新研究进展
+
+侵蚀计算着色器现在会记录每个地形位置累计的水滴侵蚀次数。当同一区域的侵蚀累积过多时，后续水滴会提前退出模拟，避免大量水滴在平原区域反复堆积并产生无效计算。
+
+- **优化前：** `4.886600 s`
+- **优化后：** `3.95707 s`
+- **性能提升：** GPU 侵蚀计算速度约提升 `19%`
+
 
 ### 重要里程碑
 - **第一阶段**：基础Vulkan环境搭建（SDL3 + Vulkan），实现简单三角形渲染
 - **第二阶段**：使用FastNoiseLite生成地形，多层噪声叠加
 - **第三阶段**：CPU端水力侵蚀模拟（后被GPU版本替代）
-- **第四阶段**：GPU计算着色器实现侵蚀，支持100万水滴并行模拟
+- **第四阶段**：GPU计算着色器实现侵蚀，支持水滴并行模拟
 - **第五阶段**：基于坡度、高度、水流量的高级纹理混合
 - **第六阶段**：（计划中）实现无限地形区块加载
 

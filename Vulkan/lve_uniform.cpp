@@ -1,18 +1,26 @@
 ﻿#include"lve_uniform.h"
-
+#include<array>
 namespace lve {
 	void LveUniform::createDescriptorSetLayout(VkDevice device) {
-		VkDescriptorSetLayoutBinding uboLayoutBinding{};//创建结构体
-		uboLayoutBinding.binding = 0;//占用描述符集合中的binding0[就是shader里的binding那个]
-		uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;//绑定的是VkBuffer
-		uboLayoutBinding.descriptorCount = 1;//有一个描述符
-		uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;//在顶点着色器阶段使用
-		uboLayoutBinding.pImmutableSamplers = nullptr; //图像采样描述符,暂时默认
+		std::array<VkDescriptorSetLayoutBinding, 2> bindings{};
+
+		bindings[0].binding = 0;
+		bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		bindings[0].descriptorCount = 1;
+		bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;  // ★ 加 fragment
+
+		bindings[1].binding = 1;
+		bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;  // ★ 阴影图
+		bindings[1].descriptorCount = 1;
+		bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		bindings[1].pImmutableSamplers = nullptr;
+
+
 
 		VkDescriptorSetLayoutCreateInfo layoutInfo{};//信息
 		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		layoutInfo.bindingCount = 1;
-		layoutInfo.pBindings = &uboLayoutBinding;
+		layoutInfo.bindingCount = 2;
+		layoutInfo.pBindings = bindings.data();
 
 		if (vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS) {//创建
 			throw std::runtime_error("failed to create descriptor set layout!");
@@ -26,7 +34,7 @@ namespace lve {
 		vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 		vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 	}
-	void LveUniform::createUniformBuffer(uint32_t MAX_FRAMES_IN_FLIGHT,LveDevice& device) {
+	void LveUniform::createUniformBuffer(uint32_t MAX_FRAMES_IN_FLIGHT, LveDevice& device) {
 		VkDeviceSize bufferSize = sizeof(UniformBufferObject);
 
 		//为每一帧创建独立的ubo
@@ -41,33 +49,39 @@ namespace lve {
 		}
 
 	}
-	void LveUniform::updateUniformBuffer(uint32_t currentImage,VkExtent2D extent, const glm::mat4& modelMatrix, const glm::mat4& view, const glm::mat4& proj,glm::vec3 cameraPos) {
-	
+	void LveUniform::updateUniformBuffer(uint32_t currentImage, VkExtent2D extent, const glm::mat4& modelMatrix,
+		const glm::mat4& view, const glm::mat4& proj, const glm::mat4& lightViewProj, glm::vec3 cameraPos,glm::vec4 renderParams) {
+
 		//UBO
 		UniformBufferObject ubo{};
 		ubo.model = modelMatrix;
 		ubo.view = view;
 		ubo.proj = proj;
-		ubo.cameraPos = glm::vec4(cameraPos,1.0f);
+		ubo.lightViewProj = lightViewProj;
+		ubo.cameraPos = glm::vec4(cameraPos, 1.0f);
+		ubo.renderParams = renderParams;
 		memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 	}
-	void LveUniform::createDescriptorPool(uint32_t MAX_FRAMES_IN_FLIGHT,VkDevice device) {
-		VkDescriptorPoolSize poolSize{};//大小
-		poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		poolSize.descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);//数量
+	void LveUniform::createDescriptorPool(uint32_t MAX_FRAMES_IN_FLIGHT, VkDevice device) {
+		std::array<VkDescriptorPoolSize, 2> poolSizes{};
+		poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		poolSizes[0].descriptorCount = MAX_FRAMES_IN_FLIGHT;
+		poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		poolSizes[1].descriptorCount = MAX_FRAMES_IN_FLIGHT;
+
 
 		VkDescriptorPoolCreateInfo poolInfo{};//信息
 		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		poolInfo.poolSizeCount = 1;
-		poolInfo.pPoolSizes = &poolSize;
+		poolInfo.poolSizeCount = 2;
+		poolInfo.pPoolSizes = poolSizes.data();
 		poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);//最大数量
 		poolInfo.flags = 0;//保持默认
 		if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) {//创建
 			throw std::runtime_error("failed to create descriptor pool!");
 		}
 	}
-	void LveUniform::createDescriptorSets(uint32_t MAX_FRAMES_IN_FLIGHT,VkDevice device) {
-		layouts.resize(MAX_FRAMES_IN_FLIGHT,descriptorSetLayout);
+	void LveUniform::createDescriptorSets(uint32_t MAX_FRAMES_IN_FLIGHT, VkDevice device) {
+		layouts.resize(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
 		VkDescriptorSetAllocateInfo allocInfo{};
 		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		allocInfo.descriptorPool = descriptorPool;
@@ -94,6 +108,37 @@ namespace lve {
 			descriptorWrite.pImageInfo = nullptr; // Optional
 			descriptorWrite.pTexelBufferView = nullptr; // Optional
 			vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+
+			VkDescriptorImageInfo imageInfo{};
+			imageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+			imageInfo.imageView = shadowImageView;   // 从 Shadow 传进来
+			imageInfo.sampler = shadowSampler;
+
+			VkWriteDescriptorSet imageWrite{};
+			imageWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			imageWrite.dstSet = descriptorSets[i];
+			imageWrite.dstBinding = 1;
+			imageWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			imageWrite.descriptorCount = 1;
+			imageWrite.pImageInfo = &imageInfo;
+			vkUpdateDescriptorSets(
+				device,
+				1,
+				&imageWrite,
+				0,
+				nullptr
+			);
 		}
+
+
+	}
+	void LveUniform::init(LveDevice &device,uint32_t MAX_FRAMES_IN_FLIGHT, VkImageView shadowImageView,VkSampler shadowSampler) {
+		//给赋值
+		this->shadowImageView = shadowImageView;
+		this->shadowSampler = shadowSampler;
+		createDescriptorSetLayout(device.getDevice());
+		createUniformBuffer(MAX_FRAMES_IN_FLIGHT, device);
+		createDescriptorPool(MAX_FRAMES_IN_FLIGHT, device.getDevice());
+		createDescriptorSets(MAX_FRAMES_IN_FLIGHT, device.getDevice());
 	}
 }

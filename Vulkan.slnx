@@ -3,5 +3,8 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
+  <Project Path="build/build.vdproj" Type="Installer">
+    <Build />
+  </Project>
   <Project Path="Vulkan/Vulkan.vcxproj" Id="a5a08a63-b377-490f-a79a-cb4682fab1fd" />
 </Solution>

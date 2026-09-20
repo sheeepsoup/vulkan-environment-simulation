@@ -14,6 +14,7 @@ namespace lve {
 	class LveTerrain
 	{
 	public:
+		uint32_t EROSON_EXTENT = 200000;//侵蚀n次
 		void initNoise(int seed);//初始化噪声
 		void processArea(int seed);//生成地形
 		void processOcean();//生成海洋
@@ -30,6 +31,7 @@ namespace lve {
 		void updateChunkDate(std::vector<int32_t>& heightUint, float HEIGHT_FIXED_SCALE);//更新区块数据[用于侵蚀模拟完毕后重置高度]
 		void drawVisibleChunks(VkCommandBuffer commandBuffer, const glm::vec3& cameraPosition, float renderDistance);
 		void drawOcean(VkCommandBuffer commandBuffer);//绘画海洋
+		void drawAllChunks(VkCommandBuffer commandBuffer);//绘画所有区块,专门服务于阴影用的
 
 		struct TerrainRenderChunk {
 			uint32_t firstIndex;//indices中的索引
@@ -45,9 +47,10 @@ namespace lve {
 		std::vector<float> &getHeightData() { return heightData; };
 		std::vector<TerrainRenderChunk>& getRenderChunks() { return renderChunks; };
 		float getBlockDist() { return BlockDistance; };
+
 		int mapVertexCount;//地图顶点大小[x/y方向]
 	private:
-		#define EROSON_EXTENT 2000000//侵蚀n次
+
 		#define WATER_MAX_STEP 500//最大步数
 		#define MIN_WATER 0.01f//蒸发最小水量
 		#define MIN_SPEED 0.01f//最小速度

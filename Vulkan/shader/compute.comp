@@ -6,10 +6,25 @@ layout(binding = 0) buffer HeightBuffer {
 layout(binding = 1) buffer FlowBuffer {
     uint flow_int[];
 };
+layout(binding = 2) buffer ersionAmount {
+    uint ersion_int[];
+};
+layout(binding = 3) buffer researchContent{
+    uint totalCandidates;//总共有多少水滴被选择了
+    uint erosionSkipped;//因为侵蚀次数过多导致退出的雨滴
+    uint flatSlopeStopped;//因为坡度过低&&没有泥沙退出的雨滴
+};
+layout(std430, binding = 4) buffer CoarseSlopeBuffer {
+    float coarseSlope[];
+};
 layout(push_constant) uniform PushConstants {
-    int width;
+    int width;          // 高度图边长（顶点数）
     int waterDorpNum;
+    uint baseDropletId;
+    int slopeRes;       // ★ 坡度图分辨率（比如 512）
+    float slopeStep;    // ★ 高度图顶点间距（世界单位）
 } pc;
+
 
 const int   WATER_MAX_STEP = 500;//雨滴最大步数
 const float MIN_WATER = 0.01;//最小水量
@@ -19,6 +34,7 @@ const float erosionRate = 0.1;//侵蚀力度
 const float depositionRate = 0.03;//沉积力度
 const int EROSION_RADIUS = 2;//侵蚀宽度
 const int DEPOSITION_RADIUS = 1;//沉积的宽度
+const float FLAT_BOUNDARY = 0.15;//坡度过低删除的阈值
 const float inertia = 0.6;
 const float gravity = 4.0;
 const float SCALE = 10000.0;
@@ -117,17 +133,89 @@ void addHeight(vec2 pos, float delta, int radius) {
 float random01(uint value) {
 	return float(hash(value)) / 4294967295.0;
 }
-void main() {
-    uint dropletID = gl_GlobalInvocationID.x;  //水滴编号
-    if (dropletID >= pc.waterDorpNum) return;          //如果你只跑 1e6 次
+// 世界坐标 → 坡度图值
+// worldPos.xz 对应你地形网格的 x/y
+float sampleCoarseSlope(vec2 worldPos) {
+    // 世界范围 = 高度图边长 × 顶点间距
+    float worldSize = float(pc.width) * pc.slopeStep;
 
-    //初始化水滴（随机位置）
+    // 世界坐标 → 0~1 UV
+    vec2 uv = worldPos / worldSize;
+
+    // UV → 坡度图像素坐标
+    vec2 pixelF = uv * float(pc.slopeRes);
+
+    // 双线性采样
+    ivec2 p0 = ivec2(floor(pixelF));
+    vec2 f = pixelF - vec2(p0);
+
+    int x0 = clamp(p0.x,     0, pc.slopeRes - 1);
+    int y0 = clamp(p0.y,     0, pc.slopeRes - 1);
+    int x1 = clamp(p0.x + 1, 0, pc.slopeRes - 1);
+    int y1 = clamp(p0.y + 1, 0, pc.slopeRes - 1);
+
+    float s00 = coarseSlope[y0 * pc.slopeRes + x0];
+    float s10 = coarseSlope[y0 * pc.slopeRes + x1];
+    float s01 = coarseSlope[y1 * pc.slopeRes + x0];
+    float s11 = coarseSlope[y1 * pc.slopeRes + x1];
+
+    return mix(mix(s00, s10, f.x), mix(s01, s11, f.x), f.y);
+}
+void main() {
+    uint localDropletId = gl_GlobalInvocationID.x;//水滴编号
+
+    if (localDropletId >= uint(pc.waterDorpNum)) {//防止跑多
+        return;
+    }
+
+    uint dropletID = pc.baseDropletId + localDropletId;//对于的雨滴编号
+
+
+    //初始化水滴
+    float x,y;
+
     uint localSeed = dropletID * 114514u;
     uint seedX = dropletID * 114514u + 12345u;
     uint seedY = dropletID * 114514u + 98765u;
-    float x = 1.0 + random01(seedX) * float(pc.width - 3);
-    float y = 1.0 + random01(seedY) * float(pc.width - 3);
+    x = 1.0 + random01(seedX) * float(pc.width - 3);
+    y = 1.0 + random01(seedY) * float(pc.width - 3);
+    //获取当前点的侵蚀量数据
+    ivec2 spawnPoint = ivec2(floor(vec2(x, y)));
+    uint spawnIndex = uint(spawnPoint.y * pc.width + spawnPoint.x);
+    uint erosionCount = atomicAdd(ersion_int[spawnIndex], 0u);
+    //侵蚀过多不参与模拟
+    if (erosionCount >= 180u) {
+//        atomicAdd(erosionSkipped,1u);
+        return;
+    }
+
+    // 次数越多,越可能直接退出
+    float keepProbability = 1.0 - smoothstep(40.0, 180.0, float(erosionCount));
+
+    uint keepSeed = dropletID * 99871u;
+    if (random01(keepSeed) > keepProbability) {
+//        atomicAdd(erosionSkipped,1u);
+        return;
+    }
+
+
+
+//    atomicAdd(totalCandidates, 1u);//给总选择雨滴+1
+
+
     vec2  pos = vec2(x, y);
+
+    //-------------------------------------判断平原还是山地,平原直接pass[根据坡度图,可以省略很多重复计算]-----------------------------------
+    float coarseS = sampleCoarseSlope(pos * pc.slopeStep);//采样坡度图
+    bool isFlat = coarseS < FLAT_BOUNDARY;//这里的数值可以自己调合适的
+
+    //平原直接退出
+    if (isFlat) {
+//        atomicAdd(flatSlopeStopped, 1u);
+        return;
+    }
+
+
     vec2  dir = vec2(0.0);
     float speed = 1.0;
     float water = 1.0;
@@ -148,6 +236,12 @@ void main() {
         float down  = sampleHeight(oldPos + vec2( 0.0, -1.0));
         float up    = sampleHeight(oldPos + vec2( 0.0,  1.0));
         vec2 grad = vec2(right - left, up - down);
+
+        //看当前坡度和沉积量,若过小影响小直接退出
+        if(dot(grad, grad) < 0.0001f && sediment < 0.001f){
+           atomicAdd(flatSlopeStopped,1u);
+           break;
+        }
 
         //更新方向
         vec2 newDir = dir * inertia - grad * (1.0 - inertia);
@@ -185,6 +279,9 @@ void main() {
             eroded = clamp(eroded, 0.0, 0.05);
             sediment += eroded;
             addHeight(oldPos, -eroded,EROSION_RADIUS);
+            ivec2 erosionPoint = ivec2(floor(oldPos));//添加侵蚀量
+            uint erosionIndex = uint(erosionPoint.y * pc.width + erosionPoint.x);
+            atomicAdd(ersion_int[erosionIndex], 1u);
         } else {
             //沉积
             float deposit = (sediment - maxSediment) * depositionRate;

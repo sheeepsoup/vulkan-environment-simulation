@@ -152,6 +152,13 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="imgui\imgui.cpp" />
+    <ClCompile Include="imgui\imgui_demo.cpp" />
+    <ClCompile Include="imgui\imgui_draw.cpp" />
+    <ClCompile Include="imgui\imgui_impl_sdl3.cpp" />
+    <ClCompile Include="imgui\imgui_impl_vulkan.cpp" />
+    <ClCompile Include="imgui\imgui_tables.cpp" />
+    <ClCompile Include="imgui\imgui_widgets.cpp" />
     <ClCompile Include="lve_camera.cpp" />
     <ClCompile Include="lve_compute.cpp" />
     <ClCompile Include="lve_device.cpp" />
@@ -162,12 +169,22 @@
     <ClCompile Include="lve_renderPass.cpp" />
     <ClCompile Include="lve_renderPass.h" />
     <ClCompile Include="lve_swapChain.cpp" />
-    <ClCompile Include="lve_terrain.cpp" />
+    <ClCompile Include="slope.cpp" />
+    <ClCompile Include="terrain.cpp" />
     <ClCompile Include="lve_uniform.cpp" />
     <ClCompile Include="lve_windows.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="shadow.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="imgui\imconfig.h" />
+    <ClInclude Include="imgui\imgui.h" />
+    <ClInclude Include="imgui\imgui_impl_sdl3.h" />
+    <ClInclude Include="imgui\imgui_impl_vulkan.h" />
+    <ClInclude Include="imgui\imgui_internal.h" />
+    <ClInclude Include="imgui\imstb_rectpack.h" />
+    <ClInclude Include="imgui\imstb_textedit.h" />
+    <ClInclude Include="imgui\imstb_truetype.h" />
     <ClInclude Include="lve_camera.h" />
     <ClInclude Include="lve_compute.h" />
     <ClInclude Include="lve_device.h" />
@@ -177,12 +194,16 @@
     <ClInclude Include="lve_uniform.h" />
     <ClInclude Include="lve_windows.h" />
     <ClInclude Include="lve_terrain.h" />
+    <ClInclude Include="shadow.h" />
+    <ClInclude Include="slope.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="compile.bat" />
     <None Include="shader\compute.comp" />
+    <None Include="shader\shadow.vert" />
     <None Include="shader\simple_shader.frag" />
     <None Include="shader\simple_shader.vert" />
+    <None Include="shader\slope.comp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

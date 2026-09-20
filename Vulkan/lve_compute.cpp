@@ -3,7 +3,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <array>
-#define EROSON_EXTENT 2000000//侵蚀n次
+
 namespace lve {
 
     LveCompute::LveCompute(LveDevice& device, const std::string& computeShaderPath)
@@ -44,7 +44,7 @@ namespace lve {
 
     // 描述符集布局（绑定存储缓冲）
     void LveCompute::createDescriptorSetLayout() {
-        std::array<VkDescriptorSetLayoutBinding, 2> bindings = {};
+        std::array<VkDescriptorSetLayoutBinding, 5> bindings = {};
 
         bindings[0].binding = 0;
         bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -55,6 +55,21 @@ namespace lve {
         bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         bindings[1].descriptorCount = 1;
         bindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+        bindings[2].binding = 2;
+        bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        bindings[2].descriptorCount = 1;
+        bindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+		bindings[3].binding = 3;
+		bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		bindings[3].descriptorCount = 1;
+		bindings[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+        bindings[4].binding = 4;
+        bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        bindings[4].descriptorCount = 1;
+        bindings[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -70,7 +85,7 @@ namespace lve {
     void LveCompute::createDescriptorPool(uint32_t maxSets) {
         VkDescriptorPoolSize poolSize{};
         poolSize.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        poolSize.descriptorCount = maxSets * 2;//由于流量也来了所以*2
+        poolSize.descriptorCount = maxSets * 5;//由于流量也来了所以*3
 
         VkDescriptorPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -133,6 +148,13 @@ namespace lve {
         flowBuffers.resize(count);
         flowBuffersMemory.resize(count);
         flowBuffersMapped.resize(count);
+        erosionBuffers.resize(count);
+        erosionBuffersMemory.resize(count);
+        erosionBuffersMapped.resize(count);
+        researchBuffers.resize(count);
+		researchBuffersMemory.resize(count);
+		researchBuffersMapped.resize(count);
+
         for (uint32_t i = 0; i < count; i++) {
             // 使用你现成的 device.createBuffer
             device.createBuffer(
@@ -142,9 +164,6 @@ namespace lve {
                 storageBuffers[i],
                 storageBuffersMemory[i]
             );
-
-            // 映射内存，方便 CPU 随时更新数据
-            vkMapMemory(device.getDevice(), storageBuffersMemory[i], 0, size, 0, &storageBuffersMapped[i]);
             //流量
             device.createBuffer(
                 size,
@@ -155,24 +174,39 @@ namespace lve {
                 flowBuffersMemory[i]
             );
 
-            vkMapMemory(
-                device.getDevice(),
-                flowBuffersMemory[i],
-                0,
+            //创建侵蚀量内容
+            device.createBuffer(
                 size,
-                0,
-                &flowBuffersMapped[i]
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                erosionBuffers[i],
+                erosionBuffersMemory[i]
             );
-
+            //研究数据
+            device.createBuffer(
+                sizeof(ResearchStats),
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                researchBuffers[i],
+                researchBuffersMemory[i]
+            );
+            vkMapMemory(device.getDevice(), storageBuffersMemory[i], 0, size, 0, &storageBuffersMapped[i]);
+            vkMapMemory(device.getDevice(),flowBuffersMemory[i],0,size,0,&flowBuffersMapped[i]);
+            vkMapMemory(device.getDevice(),erosionBuffersMemory[i],0,size,0,&erosionBuffersMapped[i]);
+            vkMapMemory(device.getDevice(),researchBuffersMemory[i],0, sizeof(ResearchStats),0,&researchBuffersMapped[i]);
             // 原始显存内容不是自动为0
             std::memset(flowBuffersMapped[i], 0, static_cast<size_t>(size));
+            std::memset(erosionBuffersMapped[i], 0, static_cast<size_t>(size));
+            std::memset(researchBuffersMapped[i], 0, sizeof(ResearchStats));
         }
     }
 
     // ★ 新增：更新描述符集（把刚才创建的 Buffer 绑定到描述符集）
     void LveCompute::updateDescriptorSets() {
         for (uint32_t i = 0; i < descriptorSets.size(); i++) {
-            VkDescriptorBufferInfo bufferInfos[2]{};
+            VkDescriptorBufferInfo bufferInfos[5]{};
 
             bufferInfos[0].buffer = storageBuffers[i];
             bufferInfos[0].offset = 0;
@@ -182,7 +216,19 @@ namespace lve {
             bufferInfos[1].offset = 0;
             bufferInfos[1].range = bufferSize;
 
-            VkWriteDescriptorSet writes[2]{};
+            bufferInfos[2].buffer = erosionBuffers[i];
+            bufferInfos[2].offset = 0;
+            bufferInfos[2].range = bufferSize;
+
+            bufferInfos[3].buffer = researchBuffers[i];
+            bufferInfos[3].offset = 0;
+            bufferInfos[3].range = sizeof(ResearchStats);
+
+            bufferInfos[4].buffer = externalSlopeBuffers[i];    // ← 从 Slope 传入
+            bufferInfos[4].offset = 0;
+            bufferInfos[4].range = VK_WHOLE_SIZE;      // 或 slopeSize
+
+            VkWriteDescriptorSet writes[5]{}; 
 
             writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             writes[0].dstSet = descriptorSets[i];
@@ -197,10 +243,32 @@ namespace lve {
             writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
             writes[1].descriptorCount = 1;
             writes[1].pBufferInfo = &bufferInfos[1];
+  
+            writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writes[2].dstSet = descriptorSets[i];
+            writes[2].dstBinding = 2;
+            writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            writes[2].descriptorCount = 1;
+            writes[2].pBufferInfo = &bufferInfos[2];
+
+			writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			writes[3].dstSet = descriptorSets[i];
+			writes[3].dstBinding = 3;
+            writes[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            writes[3].descriptorCount = 1;
+            writes[3].pBufferInfo = &bufferInfos[3];
+
+
+            writes[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            writes[4].dstSet = descriptorSets[i];
+            writes[4].dstBinding = 4;
+            writes[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            writes[4].descriptorCount = 1;
+            writes[4].pBufferInfo = &bufferInfos[4];
 
             vkUpdateDescriptorSets(
                 device.getDevice(),
-                2,
+                5,
                 writes,
                 0,
                 nullptr
@@ -240,18 +308,31 @@ namespace lve {
     }
 
     // 记录计算命令
-    void LveCompute::recordComputeCommands(VkCommandBuffer cmdBuffer, uint32_t frameIndex, int width) {
+    void LveCompute::recordComputeCommands(VkCommandBuffer cmdBuffer,uint32_t frameIndex,int width,uint32_t batchDropletCount,uint32_t baseDropletId,
+        float slopeStep, int slopeRes) {
         vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
-        vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &descriptorSets[frameIndex], 0, nullptr);
-        const uint32_t totalDroplets = EROSON_EXTENT;
+        vkCmdBindDescriptorSets(
+            cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+            pipelineLayout, 0, 1, &descriptorSets[frameIndex],
+            0, nullptr
+        );
+
         PushConstantData pushData{};
         pushData.width = width;
-        pushData.waterDorpNum = totalDroplets;
-        vkCmdPushConstants(cmdBuffer, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(PushConstantData), &pushData);
+        pushData.waterDorpNum = static_cast<int>(batchDropletCount);
+        pushData.baseDropletId = baseDropletId;
+		pushData.slopeStep = slopeStep;
+		pushData.slopeRes = slopeRes;
 
-  
-        const uint32_t groupSize = 64;  // 和着色器里的 local_size_x 保持一致
-        uint32_t groupCount = (totalDroplets + groupSize - 1) / groupSize; // 结果 = 15625
+        vkCmdPushConstants(
+            cmdBuffer, pipelineLayout,
+            VK_SHADER_STAGE_COMPUTE_BIT,
+            0, sizeof(PushConstantData), &pushData
+        );
+
+        const uint32_t groupSize = 64;
+        const uint32_t groupCount =
+            (batchDropletCount + groupSize - 1) / groupSize;
 
         vkCmdDispatch(cmdBuffer, groupCount, 1, 1);
     }
@@ -293,15 +374,36 @@ namespace lve {
             vkUnmapMemory(vkDevice, flowBuffersMemory[i]);
             vkDestroyBuffer(vkDevice, flowBuffers[i], nullptr);
             vkFreeMemory(vkDevice, flowBuffersMemory[i], nullptr);
+
+        }
+        for (size_t i = 0; i < erosionBuffers.size(); i++) {
+            vkUnmapMemory(vkDevice, erosionBuffersMemory[i]);
+            vkDestroyBuffer(vkDevice, erosionBuffers[i], nullptr);
+            vkFreeMemory(vkDevice, erosionBuffersMemory[i], nullptr);
+        }
+        for (size_t i = 0; i < researchBuffers.size(); i++) {
+            vkUnmapMemory(vkDevice, researchBuffersMemory[i]);
+            vkDestroyBuffer(vkDevice, researchBuffers[i], nullptr);
+            vkFreeMemory(vkDevice, researchBuffersMemory[i], nullptr);
         }
 
+        researchBuffers.clear();
+        researchBuffersMemory.clear();
+        researchBuffersMapped.clear();
+        erosionBuffers.clear();
+        erosionBuffersMemory.clear();
+        erosionBuffersMapped.clear();
         flowBuffers.clear();
         flowBuffersMemory.clear();
         flowBuffersMapped.clear();
     }
 
     void LveCompute::runErosionSync(LveDevice& device, uint32_t bufferIndex, int mapVertexCount, std::vector<int32_t>& heightData,
-        std::vector<uint32_t>& flowData, VkDeviceSize bufferSize) {
+        std::vector<uint32_t>& flowData,std::vector<uint32_t>& erosionData,ResearchStats& researchData, VkDeviceSize bufferSize, float slopeStep, int slopeRes) {
+        //情空
+        std::memset(flowBuffersMapped[bufferIndex],0,static_cast<size_t>(bufferSize));
+        std::memset(erosionBuffersMapped[bufferIndex],0,static_cast<size_t>(bufferSize));
+        std::memset(researchBuffersMapped[bufferIndex],0,sizeof(ResearchStats));
         //计算地形
         updateStorageBuffer(bufferIndex, heightData.data(), bufferSize);
         //提交一次计算
@@ -317,7 +419,41 @@ namespace lve {
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         vkBeginCommandBuffer(computeCmdBuf, &beginInfo);
-        recordComputeCommands(computeCmdBuf, bufferIndex, mapVertexCount); // 只跑一次，用第0帧的 descriptor
+
+        //分批次提交,用于记录地貌
+        constexpr uint32_t batchCount = 4;
+         uint32_t batchDropletCount = EROSON_EXTENT / batchCount;
+
+        for (uint32_t batch = 0; batch < batchCount; batch++) {
+            recordComputeCommands(
+                computeCmdBuf,
+                bufferIndex,
+                mapVertexCount,
+                batchDropletCount,
+                batch * batchDropletCount,
+                slopeStep,
+                slopeRes
+            );
+
+            if (batch + 1 < batchCount) {
+                VkMemoryBarrier barrier{};
+                barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+                barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+                barrier.dstAccessMask =
+                    VK_ACCESS_SHADER_READ_BIT |
+                    VK_ACCESS_SHADER_WRITE_BIT;
+
+                vkCmdPipelineBarrier(
+                    computeCmdBuf,
+                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                    0,
+                    1, &barrier,
+                    0, nullptr,
+                    0, nullptr
+                );
+            }
+        }
         vkEndCommandBuffer(computeCmdBuf);
 
         VkSubmitInfo submitInfo{};
@@ -337,6 +473,7 @@ namespace lve {
         //计算完毕拷回来
         memcpy(heightData.data(), getMappedData(bufferIndex), bufferSize);
         memcpy(flowData.data(),getFlowMappedData(bufferIndex), sizeof(uint32_t) * flowData.size());
-       
+        memcpy(erosionData.data(),getErosionMappedData(bufferIndex), sizeof(uint32_t) * erosionData.size());
+        memcpy(&researchData,getResearchMappedData(bufferIndex),sizeof(ResearchStats));
     };
 } // namespace lve
