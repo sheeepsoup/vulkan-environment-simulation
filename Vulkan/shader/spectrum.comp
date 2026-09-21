@@ -1,4 +1,4 @@
-#version 450
+﻿#version 450
 
 layout(local_size_x = 16, local_size_y = 16) in;
 
@@ -13,8 +13,8 @@ layout(push_constant) uniform SpectrumPushConstant {
 
 const float PI = 3.14159265;
 vec2 windDirection = vec2(1.0f, 0.3f);//风向[后面塞到push_contant里面]
-float windSpeed = 1.0f;//风速[后面塞到push_content里面]
-float fetch = 1000.0f;//风区长度[后面塞到push_content里面](风在海面吹过的距离,越小海浪越年轻)
+float windSpeed = 12.0f;//风速[后面塞到push_content里面]
+float fetch = 10000.0f;//风区长度[后面塞到push_content里面](风在海面吹过的距离,越小海浪越年轻)
 float gamma = 3.3f;//主浪峰的峰尖长度
 
 const float normalizeContent = 4.0;//风向集中程度,越大顺风的浪越明显
@@ -92,7 +92,7 @@ void main() {
         imageStore(h0Spectrum, ivec2(pixel), vec4(0.0));
         return;
     }
-        vec2 dir = normalize(k);//波的方向
+    vec2 dir = normalize(k);//波的方向
     float directionFactor = pow(max(dot(dir, windDirection), 0.0), normalizeContent);//风向因子[dot后-1 ->逆风走,能量低 1->顺风走,能量高]
 
     //计算频谱图的值[JOSNWARP来算能量]
@@ -100,7 +100,7 @@ void main() {
     
     float baseEnergy = jonswap(omega,windSpeed,fetch,gamma);//当前海浪基础能量
     float finalEnergy = baseEnergy * directionFactor * deltaK * deltaK;//加上风的影响
-
+    //finalEnergy = clamp(finalEnergy * 10000.0, 0.0, 1.0);//单纯debug测试用
     //能量算完了加点随机*---------------------------------------------------------------------------------------------------------------------
     vec2 randomComplex = gaussianRandom(pixel);//获取2个随机数
     float amplitude = sqrt(max(finalEnergy, 0.0) * 0.5);//缩放系数,防止能量白算

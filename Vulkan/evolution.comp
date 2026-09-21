@@ -1,0 +1,82 @@
+﻿#version 450
+layout(local_size_x = 16, local_size_y = 16) in;
+layout(binding = 0, rg32f) uniform readonly image2D h0Spectrum;//从specturm得到的海浪初始图
+layout(binding = 1, rg32f) uniform writeonly image2D htSpectrum;//输出的海浪演变图
+layout(push_constant) uniform EvolutionPushConstant {
+    uint resolution;
+    uint oceanRange;
+    float time;
+    float padding;//?
+} pc;
+
+const float PI = 3.14159265;
+
+//复数乘法函数
+vec2 complexMultiply(vec2 a, vec2 b) {
+    return vec2(
+        a.x * b.x - a.y * b.y,
+        a.x * b.y + a.y * b.x
+    );
+}
+
+void main(){
+    uvec2 pixel = gl_GlobalInvocationID.xy;
+
+    if (pixel.x >= pc.resolution || pixel.y >= pc.resolution) {
+        return;
+    }
+    //转换坐标
+    ivec2 grid = ivec2(pixel) - ivec2(pc.resolution / 2);
+      //计算波数
+    float deltaK = 2.0 * PI / float(pc.oceanRange);//波数间距
+    vec2 k =  vec2(grid) * deltaK;//波数向量
+    float kLength = length(k);//波的大小[长波短波同时也影响能量大小]
+    if (kLength < 0.00001) {//去掉中心点,中心点不表示波
+        imageStore(htSpectrum, ivec2(pixel), vec4(0.0));
+        return;
+    }
+
+    // 根据波数计算角频率，不是 JONSWAP 能量计算
+    float omega = sqrt(9.81 * kLength);//角频率[既定公式不用管]
+
+
+    //-----------------------------------------------------------------------------------------------------上面与spectrum重复复制的
+    vec2 h0k = imageLoad(h0Spectrum, ivec2(pixel)).rg;//获取specturm的海浪信息
+    // 找到 -k 对应的频谱像素
+    uvec2 oppositePixel = uvec2((pc.resolution - pixel.x) % pc.resolution,(pc.resolution - pixel.y) % pc.resolution);//计算-k对应的像素坐标.用于去掉虚部传给ifft
+    vec2 h0MinusK = imageLoad(h0Spectrum, ivec2(oppositePixel)).rg;//获取-k对应的海浪信息
+    // 共轭：虚部取反
+    h0MinusK.y = -h0MinusK.y;
+    float theta = omega * pc.time;//相位,omega来改变大波小波的相位速度
+
+    //Evolution的公式~看不懂喵------------------------------------------------------
+    // e^( i × theta )
+    vec2 positivePhase = vec2(cos(theta), sin(theta));
+
+    // e^( -i × theta )
+    vec2 negativePhase = vec2(cos(theta), -sin(theta));
+
+    // h0(k) × e^( iωt )
+    vec2 forwardWave = complexMultiply(
+        h0k,
+        positivePhase
+    );
+
+    // conjugate(h0(-k)) × e^( -iωt )
+    vec2 backwardWave = complexMultiply(
+        h0MinusK,
+        negativePhase
+    );
+
+    // H(k,t)
+    vec2 hkt = forwardWave + backwardWave;
+
+    //--------------------------------------------------------------------------
+    
+    // 写入当前时刻的动态频谱
+    imageStore(
+        htSpectrum,
+        ivec2(pixel),
+        vec4(hkt, 0.0, 0.0)
+    );
+}

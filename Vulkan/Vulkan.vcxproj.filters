@@ -46,6 +46,12 @@
     <Filter Include="源文件\ocean">
       <UniqueIdentifier>{1830dfa9-f21d-4efd-9890-05273a2fdb2f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="资源文件\shader\terrain">
+      <UniqueIdentifier>{2d94cb5a-abb1-4113-bcb6-190499a44056}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="资源文件\shader\main">
+      <UniqueIdentifier>{7a807637-a656-42e4-85c8-92b1788a11cb}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="imgui\imgui.cpp">
@@ -123,6 +129,9 @@
     <ClCompile Include="spectrum.cpp">
       <Filter>源文件\ocean</Filter>
     </ClCompile>
+    <ClCompile Include="evolution.cpp">
+      <Filter>源文件\ocean</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="imgui\imconfig.h">
@@ -188,27 +197,33 @@
     <ClInclude Include="spectrum.h">
       <Filter>头文件\ocean</Filter>
     </ClInclude>
+    <ClInclude Include="evolution.h">
+      <Filter>头文件\ocean</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="compile.bat">
       <Filter>源文件</Filter>
     </None>
-    <None Include="shader\simple_shader.frag">
-      <Filter>资源文件\shader</Filter>
-    </None>
-    <None Include="shader\simple_shader.vert">
-      <Filter>资源文件\shader</Filter>
+    <None Include="shader\spectrum.comp">
+      <Filter>资源文件\shader\ocean</Filter>
     </None>
     <None Include="shader\compute.comp">
-      <Filter>资源文件\shader</Filter>
+      <Filter>资源文件\shader\terrain</Filter>
     </None>
-    <None Include="shader\shadow.vert">
-      <Filter>资源文件\shader</Filter>
+    <None Include="shader\simple_shader.vert">
+      <Filter>资源文件\shader\main</Filter>
+    </None>
+    <None Include="shader\simple_shader.frag">
+      <Filter>资源文件\shader\main</Filter>
     </None>
     <None Include="shader\slope.comp">
-      <Filter>资源文件\shader</Filter>
+      <Filter>资源文件\shader\terrain</Filter>
     </None>
-    <None Include="shader\spectrum.comp">
+    <None Include="shader\shadow.vert">
+      <Filter>资源文件\shader\main</Filter>
+    </None>
+    <None Include="evolution.comp">
       <Filter>资源文件\shader\ocean</Filter>
     </None>
   </ItemGroup>

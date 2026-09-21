@@ -152,6 +152,7 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="evolution.cpp" />
     <ClCompile Include="imgui\imgui.cpp" />
     <ClCompile Include="imgui\imgui_demo.cpp" />
     <ClCompile Include="imgui\imgui_draw.cpp" />
@@ -179,6 +180,7 @@
     <ClCompile Include="shadow.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="evolution.h" />
     <ClInclude Include="imgui\imconfig.h" />
     <ClInclude Include="imgui\imgui.h" />
     <ClInclude Include="imgui\imgui_impl_sdl3.h" />
@@ -203,6 +205,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="compile.bat" />
+    <None Include="evolution.comp" />
     <None Include="shader\compute.comp" />
     <None Include="shader\shadow.vert" />
     <None Include="shader\simple_shader.frag" />

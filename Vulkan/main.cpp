@@ -1,5 +1,10 @@
 ﻿//后面着色器换成slang
+/*
+待理解:
+shadow的计算和构建数学原理
+spectrum.comp里evlution的数学原理
 
+*/
 
 
 #include<SDL3/SDL.h>
@@ -22,6 +27,7 @@
 #include"spectrum.h"
 #include "slope.h"
 #include "shadow.h"
+#include"evolution.h"
 #include <set>
 #include<vector>
 #include <memory>
@@ -36,6 +42,9 @@ const float HEIGHT_FIXED_SCALE = 10000.0f;//这个用于int->float还原,不用�
 const float cameraMaxSeeDistance = 450.0f;
 glm::vec3 lightDir = glm::normalize(glm::vec3(0.137f, -0.33f, 0.0066f));//光源方向
 const int   g_terrainScale = 2;//地形缩放大小
+
+const int reslution = 256;//频谱图分辨率
+const int oceanRange = 200;//海洋范围,单位米
 //----------------------------------------------------------------------------------------
 //本地无限地形生成开关
 bool unlimitedArea = false;
@@ -53,7 +62,9 @@ lve::LveCompute compute(device, "shader/compute.comp.spv");
 lve::LveTerrain terrain;
 shadow::Shadow shadowObj(device, "shader/shadow.vert.spv");
 slope::Slope slopeCompute(device, "shader/slope.comp.spv");
-std::unique_ptr<spectrum::Spectrum> spectrumObj;//构造在下面main海水部分里面,防止device未初始化报错
+std::unique_ptr<evolution::Evolution> evolutionObj;//与下同   [海水演变的类]
+std::unique_ptr<spectrum::Spectrum> spectrumObj;//构造在下面main海水部分里面,防止device未初始化报错   [海水海浪频谱图生成]
+
 
 uint32_t currentFrame = 0;//当前帧
 
@@ -450,15 +461,11 @@ int main() {
 		<< " seconds\n";
 
 	//生成海洋-------------------------------------------------------------------------------------------------------------
-	spectrumObj = std::make_unique<spectrum::Spectrum>(
-		device,
-		"shader/spectrum.comp.spv",
-		256,
-		200
-	);//这构造,防止上面未初始化device报错
+	spectrumObj = std::make_unique<spectrum::Spectrum>(device,"shader/spectrum.comp.spv", reslution,oceanRange);//这构造,防止上面未初始化device报错
 	spectrumObj->generateInitialSpectrum();//创建频谱图,[路径][分辨率]
+	evolutionObj = std::make_unique<evolution::Evolution>(device,*spectrumObj,"shader/evolution.comp.spv",reslution,oceanRange);//海水演变
 	terrain.processOcean();
-
+	//-------------------------------------------------------------------------------------------------------------
 	//放大地形
 	terrain.SetModelSize(g_terrainScale);
 
@@ -662,6 +669,8 @@ int main() {
 			glm::vec3(0.0f, 0.0f, 0.0f),
 			800.0f);
 
+
+		evolutionObj.recordEvolutionCommands(commandBuffer, time);//海洋波浪演化
 		renderer.run(device.getDevice(), swapChain, device.getGraphicsQueue(), device.getPresentQueue(),
 			currentFrame, renderPass.getRenderPass(),model,uniform.getDescriptorSets(),pipeLine.getPipelineLayout(),
 			uniform, modelMatrix,camera.getView(),camera.getProjection(),compute,camera.getPos(),terrain.getIndices(),terrain, cameraMaxSeeDistance, shadowObj,
