@@ -19,50 +19,35 @@
     <Filter Include="imgui">
       <UniqueIdentifier>{bfc6e60b-ba1f-4c80-ab70-bb9d370f8ca1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="头文件\terrain">
+      <UniqueIdentifier>{7d60cbf7-172b-4d6b-9abe-563f10c3f176}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\main">
+      <UniqueIdentifier>{7c0ccf74-39a2-4903-b7d0-866a00e2ccad}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\shadow">
+      <UniqueIdentifier>{7a842e5a-da30-481c-9360-5447e482f29d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="头文件\ocean">
+      <UniqueIdentifier>{a9abfcf4-fcc5-4274-8b64-1a131265b4aa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\main">
+      <UniqueIdentifier>{bd795f75-5b72-4c7f-b253-50ce249ec40f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\shadow">
+      <UniqueIdentifier>{50b9225c-2243-4e72-8d3c-1245cba49fef}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\terrain">
+      <UniqueIdentifier>{48956ec7-0c8f-44e1-b29a-836e3f9598b9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="资源文件\shader\ocean">
+      <UniqueIdentifier>{a0e76fef-3bc5-4045-bd90-71408395e750}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="源文件\ocean">
+      <UniqueIdentifier>{1830dfa9-f21d-4efd-9890-05273a2fdb2f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="lve_windows.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="lve_pipeline.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="lve_device.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="lve_swapChain.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="lve_renderPass.h">
-      <Filter>头文件</Filter>
-    </ClCompile>
-    <ClCompile Include="lve_renderPass.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="lve_renderer.h">
-      <Filter>头文件</Filter>
-    </ClCompile>
-    <ClCompile Include="lve_renderer.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="lve_model.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="lve_uniform.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="lve_camera.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="lve_compute.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="terrain.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="imgui\imgui.cpp">
       <Filter>imgui</Filter>
     </ClCompile>
@@ -84,41 +69,62 @@
     <ClCompile Include="imgui\imgui_widgets.cpp">
       <Filter>imgui</Filter>
     </ClCompile>
-    <ClCompile Include="shadow.cpp">
+    <ClCompile Include="lve_renderer.h">
+      <Filter>头文件\main</Filter>
+    </ClCompile>
+    <ClCompile Include="lve_renderPass.h">
+      <Filter>头文件\main</Filter>
+    </ClCompile>
+    <ClCompile Include="lve_camera.cpp">
+      <Filter>源文件\main</Filter>
+    </ClCompile>
+    <ClCompile Include="lve_compute.cpp">
+      <Filter>源文件\main</Filter>
+    </ClCompile>
+    <ClCompile Include="lve_device.cpp">
+      <Filter>源文件\main</Filter>
+    </ClCompile>
+    <ClCompile Include="lve_model.cpp">
+      <Filter>源文件\main</Filter>
+    </ClCompile>
+    <ClCompile Include="lve_pipeline.cpp">
+      <Filter>源文件\main</Filter>
+    </ClCompile>
+    <ClCompile Include="lve_renderer.cpp">
+      <Filter>源文件\main</Filter>
+    </ClCompile>
+    <ClCompile Include="lve_renderPass.cpp">
+      <Filter>源文件\main</Filter>
+    </ClCompile>
+    <ClCompile Include="lve_swapChain.cpp">
+      <Filter>源文件\main</Filter>
+    </ClCompile>
+    <ClCompile Include="lve_uniform.cpp">
+      <Filter>源文件\main</Filter>
+    </ClCompile>
+    <ClCompile Include="lve_windows.cpp">
+      <Filter>源文件\main</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="shadow.cpp">
+      <Filter>源文件\shadow</Filter>
+    </ClCompile>
     <ClCompile Include="slope.cpp">
-      <Filter>源文件</Filter>
+      <Filter>源文件\terrain</Filter>
+    </ClCompile>
+    <ClCompile Include="terrain.cpp">
+      <Filter>源文件\terrain</Filter>
+    </ClCompile>
+    <ClCompile Include="ocean.cpp">
+      <Filter>源文件\ocean</Filter>
+    </ClCompile>
+    <ClCompile Include="spectrum.cpp">
+      <Filter>源文件\ocean</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="lve_windows.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="lve_pipeline.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="lve_device.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="lve_swapChain.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="lve_model.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="lve_uniform.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="lve_camera.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="lve_compute.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="lve_terrain.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="imgui\imconfig.h">
       <Filter>imgui</Filter>
     </ClInclude>
@@ -143,11 +149,44 @@
     <ClInclude Include="imgui\imstb_truetype.h">
       <Filter>imgui</Filter>
     </ClInclude>
-    <ClInclude Include="shadow.h">
-      <Filter>头文件</Filter>
+    <ClInclude Include="lve_terrain.h">
+      <Filter>头文件\terrain</Filter>
+    </ClInclude>
+    <ClInclude Include="lve_camera.h">
+      <Filter>头文件\main</Filter>
+    </ClInclude>
+    <ClInclude Include="lve_compute.h">
+      <Filter>头文件\main</Filter>
+    </ClInclude>
+    <ClInclude Include="lve_device.h">
+      <Filter>头文件\main</Filter>
+    </ClInclude>
+    <ClInclude Include="lve_model.h">
+      <Filter>头文件\main</Filter>
+    </ClInclude>
+    <ClInclude Include="lve_pipeline.h">
+      <Filter>头文件\main</Filter>
+    </ClInclude>
+    <ClInclude Include="lve_swapChain.h">
+      <Filter>头文件\main</Filter>
+    </ClInclude>
+    <ClInclude Include="lve_uniform.h">
+      <Filter>头文件\main</Filter>
+    </ClInclude>
+    <ClInclude Include="lve_windows.h">
+      <Filter>头文件\main</Filter>
     </ClInclude>
     <ClInclude Include="slope.h">
-      <Filter>头文件</Filter>
+      <Filter>头文件\terrain</Filter>
+    </ClInclude>
+    <ClInclude Include="shadow.h">
+      <Filter>头文件\shadow</Filter>
+    </ClInclude>
+    <ClInclude Include="ocean.h">
+      <Filter>头文件\ocean</Filter>
+    </ClInclude>
+    <ClInclude Include="spectrum.h">
+      <Filter>头文件\ocean</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -168,6 +207,9 @@
     </None>
     <None Include="shader\slope.comp">
       <Filter>资源文件\shader</Filter>
+    </None>
+    <None Include="shader\spectrum.comp">
+      <Filter>资源文件\shader\ocean</Filter>
     </None>
   </ItemGroup>
 </Project>

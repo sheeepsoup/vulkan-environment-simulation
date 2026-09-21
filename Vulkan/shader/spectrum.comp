@@ -1,0 +1,109 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(binding = 0, rg32f) uniform writeonly image2D h0Spectrum;
+
+layout(push_constant) uniform SpectrumPushConstant {
+    uint resolution;
+    uint oceanRange;
+
+} pc;
+
+
+const float PI = 3.14159265;
+vec2 windDirection = vec2(1.0f, 0.3f);//风向[后面塞到push_contant里面]
+float windSpeed = 1.0f;//风速[后面塞到push_content里面]
+float fetch = 1000.0f;//风区长度[后面塞到push_content里面](风在海面吹过的距离,越小海浪越年轻)
+float gamma = 3.3f;//主浪峰的峰尖长度
+
+const float normalizeContent = 4.0;//风向集中程度,越大顺风的浪越明显
+
+//计算频谱图的值[JOSNWARP来算能量]
+float jonswap(float omega,float windSpeed,float fetch,float gamma) {
+    const float g = 9.81;
+
+    float alpha =
+        0.076 *
+        pow((windSpeed * windSpeed) / (fetch * g), 0.22);
+
+    float omegaPeak =
+        22.0 *
+        pow((g * g) / (windSpeed * fetch), 1.0 / 3.0);
+
+    float sigma =
+        omega <= omegaPeak ? 0.07 : 0.09;
+
+    float peakShape = exp(
+        -pow(omega - omegaPeak, 2.0) /
+        (2.0 * sigma * sigma * omegaPeak * omegaPeak)
+    );
+
+    float baseSpectrum =
+        alpha *
+        g * g /
+        pow(omega, 5.0) *
+        exp(-1.25 * pow(omegaPeak / omega, 4.0));
+
+    return baseSpectrum * pow(gamma, peakShape);
+}
+
+
+//2个随机数
+uint hash(uint value) {
+    value ^= value >> 16u;
+    value *= 0x7feb352du;
+    value ^= value >> 15u;
+    value *= 0x846ca68bu;
+    value ^= value >> 16u;
+    return value;
+}
+float random01(uvec2 pixel, uint salt) {
+    uint value =
+        pixel.x * 1973u +
+        pixel.y * 9277u +
+        salt * 26699u;
+
+    return float(hash(value)) / 4294967295.0;
+}
+
+vec2 gaussianRandom(uvec2 pixel) {
+    float u1 = max(random01(pixel, 17u), 0.000001);
+    float u2 = random01(pixel, 53u);
+
+    float radius = sqrt(-2.0 * log(u1));
+    float angle = 2.0 * PI * u2;
+
+    return radius * vec2(cos(angle), sin(angle));
+}
+void main() {
+    uvec2 pixel = gl_GlobalInvocationID.xy;
+
+    if (pixel.x >= pc.resolution || pixel.y >= pc.resolution) {
+        return;
+    }
+    //转换坐标
+    ivec2 grid = ivec2(pixel) - ivec2(pc.resolution / 2);
+    //计算波数
+    float deltaK = 2.0 * PI / float(pc.oceanRange);//波数间距
+    vec2 k =  vec2(grid) * deltaK;//波数向量
+    float kLength = length(k);//波的大小[长波短波同时也影响能量大小]
+    if (kLength < 0.00001) {//去掉中心点,中心点不表示波
+        imageStore(h0Spectrum, ivec2(pixel), vec4(0.0));
+        return;
+    }
+        vec2 dir = normalize(k);//波的方向
+    float directionFactor = pow(max(dot(dir, windDirection), 0.0), normalizeContent);//风向因子[dot后-1 ->逆风走,能量低 1->顺风走,能量高]
+
+    //计算频谱图的值[JOSNWARP来算能量]
+    float omega = sqrt(9.81 * kLength);//角频率[既定公式不用管]
+    
+    float baseEnergy = jonswap(omega,windSpeed,fetch,gamma);//当前海浪基础能量
+    float finalEnergy = baseEnergy * directionFactor * deltaK * deltaK;//加上风的影响
+
+    //能量算完了加点随机*---------------------------------------------------------------------------------------------------------------------
+    vec2 randomComplex = gaussianRandom(pixel);//获取2个随机数
+    float amplitude = sqrt(max(finalEnergy, 0.0) * 0.5);//缩放系数,防止能量白算
+    vec2 h0 = randomComplex * amplitude;//[坐标]波的方向(x,y)和能量(length)[R]复数实部 [G]复数虚部
+    imageStore(h0Spectrum,ivec2(pixel),vec4(h0, 0.0, 0.0));
+}

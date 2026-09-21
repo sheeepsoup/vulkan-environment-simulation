@@ -13,25 +13,7 @@ if not exist "%GLSLC%" (
 
 echo Removing UTF-8 BOM...
 
-for %%F in (
-    "shader\simple_shader.vert"
-    "shader\simple_shader.frag"
-    "shader\compute.comp"
-    "shader\slope.comp"
-    "shader\shadow.vert"
-) do (
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-    "$path = [IO.Path]::GetFullPath('%%~F');" ^
-    "$bytes = [IO.File]::ReadAllBytes($path);" ^
-    "if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {" ^
-    "  $result = New-Object byte[] ($bytes.Length - 3);" ^
-    "  [Array]::Copy($bytes, 3, $result, 0, $result.Length);" ^
-    "  [IO.File]::WriteAllBytes($path, $result);" ^
-    "  Write-Host ('[BOM removed] ' + $path)" ^
-    "} else {" ^
-    "  Write-Host ('[No BOM]      ' + $path)" ^
-    "}"
-)
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$files = @('shader\simple_shader.vert','shader\simple_shader.frag','shader\compute.comp','shader\slope.comp','shader\shadow.vert','shader\spectrum.comp'); foreach ($relativePath in $files) { $path = Join-Path (Get-Location) $relativePath; if (-not (Test-Path -LiteralPath $path)) { Write-Host ('[Missing]     ' + $relativePath); continue }; $bytes = [System.IO.File]::ReadAllBytes($path); if ($bytes.Length -ge 3 -and $bytes[0] -eq 239 -and $bytes[1] -eq 187 -and $bytes[2] -eq 191) { $result = New-Object byte[] ($bytes.Length - 3); [Array]::Copy($bytes, 3, $result, 0, $result.Length); [System.IO.File]::WriteAllBytes($path, $result); Write-Host ('[BOM removed] ' + $relativePath) } else { Write-Host ('[No BOM]      ' + $relativePath) } }"
 
 echo.
 echo Compiling vertex shader...
@@ -42,7 +24,7 @@ echo Compiling fragment shader...
 "%GLSLC%" "shader\simple_shader.frag" -o "shader\simple_shader.frag.spv"
 if errorlevel 1 goto compile_failed
 
-echo Compiling compute shader...
+echo Compiling erosion compute shader...
 "%GLSLC%" "shader\compute.comp" -o "shader\compute.comp.spv"
 if errorlevel 1 goto compile_failed
 
@@ -52,6 +34,10 @@ if errorlevel 1 goto compile_failed
 
 echo Compiling shadow vertex shader...
 "%GLSLC%" "shader\shadow.vert" -o "shader\shadow.vert.spv"
+if errorlevel 1 goto compile_failed
+
+echo Compiling spectrum compute shader...
+"%GLSLC%" "shader\spectrum.comp" -o "shader\spectrum.comp.spv"
 if errorlevel 1 goto compile_failed
 
 echo.

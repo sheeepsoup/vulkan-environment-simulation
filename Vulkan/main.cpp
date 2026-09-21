@@ -19,11 +19,12 @@
 #include"lve_camera.h"
 #include"lve_compute.h"
 #include"lve_terrain.h"
+#include"spectrum.h"
 #include "slope.h"
 #include "shadow.h"
 #include <set>
 #include<vector>
-
+#include <memory>
 #include"imgui/imgui.h"
 #include"imgui/imgui_impl_vulkan.h"
 #include"imgui/imgui_impl_sdl3.h"
@@ -52,6 +53,7 @@ lve::LveCompute compute(device, "shader/compute.comp.spv");
 lve::LveTerrain terrain;
 shadow::Shadow shadowObj(device, "shader/shadow.vert.spv");
 slope::Slope slopeCompute(device, "shader/slope.comp.spv");
+std::unique_ptr<spectrum::Spectrum> spectrumObj;//构造在下面main海水部分里面,防止device未初始化报错
 
 uint32_t currentFrame = 0;//当前帧
 
@@ -255,6 +257,7 @@ void clean() {
 	model.clean(device.getDevice());
 	compute.clean();
 	slopeCompute.clean();
+	spectrumObj->clean();
 	uniform.clean(device.getDevice(),renderer.getMaxFramesInFlight());
 	auto vkDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(device.getInstance(), "vkDestroyDebugUtilsMessengerEXT");
 	if (vkDestroyDebugUtilsMessengerEXT) {
@@ -446,7 +449,14 @@ int main() {
 			normalEnd - normalStart).count()
 		<< " seconds\n";
 
-	//生成海洋
+	//生成海洋-------------------------------------------------------------------------------------------------------------
+	spectrumObj = std::make_unique<spectrum::Spectrum>(
+		device,
+		"shader/spectrum.comp.spv",
+		256,
+		200
+	);//这构造,防止上面未初始化device报错
+	spectrumObj->generateInitialSpectrum();//创建频谱图,[路径][分辨率]
 	terrain.processOcean();
 
 	//放大地形
