@@ -1,6 +1,7 @@
-# 🌄 Vulkan 环境渲染模拟器
+# 🌄 Vulkan GPU Hydraulic Erosion
+
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/16667eff-fd7d-44ea-857f-8fa578816c2a" alt="地形渲染全景" width="100%"/>
+  Experimental Vulkan terrain renderer with GPU hydraulic erosion, procedural materials, shadows, and atmospheric rendering.
 </p>
 
 <p align="center">
@@ -9,149 +10,163 @@
 
 ---
 
-## <a id="english"></a>🇬🇧 English
-
-## 📖 Introduction
-
-A graphics rendering project learning Vulkan from scratch, aiming to build a real-time rendering simulator for natural environments including **terrain, vegetation, water bodies, clouds, and oceans**.
-
-> This project is planned for long-term development. Welcome to star and follow my progress! ⭐
-
-Currently completed: terrain generation and hydraulic erosion simulation. More environmental elements will be added progressively.
-
----
-
-## ✨ Current Features
-
-- 🏔️ **Procedural Terrain Generation** — Multi-layer noise blending based on FastNoiseLite for highly detailed terrain
-- 💧 **GPU Hydraulic Erosion Simulation** — Compute shader simulation with 200,000 droplets, creating natural gullies and sediment deposits
-- 🎨 **Intelligent Texture Blending** — Automatically blends grass/dirt/rock/snow based on slope, height, normal direction, and water flow
-- 🌫️ **Atmospheric Fog** — Distance-based fog rendering for enhanced scene depth
-- 🖱️ **Free Camera Control** — WASD movement + mouse rotation for full 3D observation
-
----
-
 ## 📸 Gallery
 
-<img width="1370" height="815" alt="Terrain Overview" src="https://github.com/user-attachments/assets/16667eff-fd7d-44ea-857f-8fa578816c2a" />
-
-## ✨ Features
-
-> Erosion-simulated terrain generation
-> Unique terrain texture algorithm
-
-### 🧪 Latest Research Update
-
-The erosion shader now tracks how many droplets have affected each terrain location. When erosion accumulates too heavily in the same area, subsequent droplets can exit early. This avoids excessive droplet accumulation and redundant computation on flat terrain.
-
-- **Before:** `4.886600 s`
-- **After:** `3.95707 s`
-- **Improvement:** approximately `19%` faster GPU erosion
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/de7d7099-27e5-4cbf-825d-2044da3f11c9" width="100%" alt="Terrain overview"/>
+  <img src="https://github.com/user-attachments/assets/278b55c9-92d7-47fc-9864-90f8f4695d79" width="100%" alt="Terrain erosion result"/>
+  <img src="https://github.com/user-attachments/assets/4ff2dd5c-5855-4e06-be60-cd35b529b77e" width="100%" alt="Terrain material rendering"/>
+  <img src="https://github.com/user-attachments/assets/6d0e04a6-d846-4325-8835-53eac87491ce" width="100%" alt="Terrain shadow rendering"/>
+</p>
 
 ---
 
-### Key Milestones
+## <a id="english"></a>🇬🇧 English
 
-- **Phase 1**: Basic Vulkan setup (SDL3 + Vulkan), simple triangle rendering
-- **Phase 2**: Terrain generation with FastNoiseLite, multi-layer noise blending
-- **Phase 3**: CPU-based hydraulic erosion (later replaced by GPU version)
-- **Phase 4**: GPU compute shader erosion with parallel droplet simulation
-- **Phase 5**: Advanced texture blending based on slope, height, and water flow
-- **Phase 6**: (Planned) Infinite terrain chunk loading
+## Introduction
 
----
+A Vulkan learning and experimental rendering project focused on procedural terrain and GPU hydraulic erosion.
 
-### 🔮 Planned Features
+The current goal is not only to render terrain, but also to explore how erosion quality, GPU time, water-droplet allocation, slope filtering, and atomic-operation pressure affect the final landform.
 
-- **Phase 6**: Infinite terrain chunk loading with LOD
-- **Phase 7**: Vegetation system (trees and grass)
-- **Phase 8**: Lake and ocean rendering
-- **Phase 9**: Dynamic cloud system
+## Current Features
 
----
+- 🏔️ **Procedural terrain generation** using multi-layer FastNoiseLite noise
+- 💧 **GPU hydraulic erosion** implemented with Vulkan compute shaders
+- 🌊 Supports large-scale water-droplet erosion simulation with configurable droplet counts and step limits
+- 📉 **Slope pre-pass** for identifying nearly flat regions before erosion
+- ⚡ Early termination for droplets with low terrain influence
+- 🧪 Erosion, flow, step-count, and movement-distance buffers for experimentation and profiling
+- 🪨 Terrain material blending for **grass, dirt, rock, and snow**
+- 🏔️ Material selection influenced by height, slope, normal direction, flow accumulation, and procedural noise
+- 🌫️ Distance fog for atmospheric depth
+- ☀️ Directional-light shadow-map prototype
+- 🖱️ Free camera controls: WASD movement and mouse look
+- 🛠️ ImGui debug controls for terrain, erosion, and rendering parameters
+- 🌊 Basic ocean/water surface prototype
 
-### Notes on the Code
+## Current Research Direction
 
-> The commented-out CPU erosion code in `lve_model.cpp` is a remnant of the initial implementation.
-> It is kept to show the learning path and for potential performance comparisons in the future.
+The erosion system is being optimized through:
 
----
+- Flat-region filtering based on terrain slope
+- Droplet early-exit conditions
+- Erosion-history tracking
+- GPU-side statistics collection
+- Reducing unnecessary sampling and atomic updates
+- Comparing terrain detail preservation against GPU execution time
 
-## 🛠️ Building
+Historical benchmark progression for the same test scene:
+
+```text
+4.886600 s → 3.957070 s → 1.700000 s → 1.039470 s
+```
+
+Actual performance depends on GPU power mode, terrain size, droplet count, and shader parameters.
+
+## Planned Features
+
+- FFT ocean simulation
+- Better shadow filtering and stability
+- PBR material refinement
+- Rain, wetness, and water accumulation
+- Rivers, lakes, coastlines, and beaches
+- Vegetation system: trees, grass, and biome placement
+- Volumetric clouds and weather
+- Terrain chunk streaming and LOD
+- More systematic erosion-quality evaluation tools
+
+## Building
 
 ### Dependencies
-- [SDL3](https://github.com/libsdl-org/SDL) — Window and input management
-- [Vulkan SDK](https://vulkan.lunarg.com/) — Graphics and compute API
-- [GLM](https://github.com/g-truc/glm) — Mathematics library
-- [FastNoiseLite](https://github.com/Auburn/FastNoiseLite) — Procedural noise generation
 
+- [Vulkan SDK](https://vulkan.lunarg.com/)
+- [SDL3](https://github.com/libsdl-org/SDL)
+- [GLM](https://github.com/g-truc/glm)
+- [FastNoiseLite](https://github.com/Auburn/FastNoiseLite)
+- Dear ImGui
 
+### Notes
+
+Compile the GLSL shaders before running the program:
+
+```bat
+compile.bat
+```
+
+Then build the Vulkan solution with Visual Studio.
+
+---
 
 ## <a id="chinese"></a>🇨🇳 中文
 
-# 🌄 Vulkan 环境渲染模拟器
+## 简介
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/16667eff-fd7d-44ea-857f-8fa578816c2a" alt="地形渲染全景" width="100%"/>
-</p>
+这是一个基于 Vulkan 的地形渲染与 GPU 水力侵蚀实验项目。
 
+项目不仅关注“生成一张地形”，也在探索侵蚀质量、GPU 时间、水滴分配、坡度筛选和原子操作竞争之间的关系。
 
-## 📖 简介
-这是一个从零开始学习 Vulkan 的图形渲染项目，目标是实现一个包含**地形、植被、水体、云层、海洋**等自然环境的实时渲染模拟器。
-> 项目预计持续开发很长时间，欢迎收藏关注我的进展！⭐
-目前已完成地形生成与水力侵蚀模拟，后续将逐步添加更多环境要素。
-----
+## 当前功能
 
+- 🏔️ 使用 FastNoiseLite 多层噪声生成程序化地形
+- 💧 使用 Vulkan Compute Shader 实现 GPU 水力侵蚀
+- 🌊 支持可配置水滴数量与步数的大规模侵蚀模拟
+- 📉 使用坡度预计算识别近平坦区域
+- ⚡ 对影响很小的水滴进行提前终止
+- 🧪 记录侵蚀次数、流量、移动距离和步数等实验数据
+- 🪨 根据草地、泥土、岩石、雪地进行地形材质混合
+- 🏔️ 材质会受到高度、坡度、法线方向、水流量和噪声影响
+- 🌫️ 基于距离的环境雾效
+- ☀️ 方向光阴影贴图原型
+- 🖱️ WASD 移动与鼠标视角控制
+- 🛠️ ImGui 调试面板，可调整地形、侵蚀和渲染参数
+- 🌊 基础海洋/水面原型
 
-## ✨ 当前功能
-- 🏔️ **程序化地形生成** — 基于 FastNoiseLite 的多层噪声叠加，生成高细节地形
-- 💧 **GPU 水力侵蚀模拟** — 计算着色器并行模拟 20 万水滴，形成自然沟壑与沉积
-- 🎨 **智能纹理混合** — 根据坡度、高度、法线方向和水流流量，自动混合草地/泥土/岩石/雪地
-- 🌫️ **环境雾效** — 基于距离的雾效渲染，增强场景层次感
-- 🖱️ **自由摄像机控制** — WASD 移动 + 鼠标旋转，全方位观察地形
+## 当前研究方向
 
+目前主要从这些方面优化侵蚀系统：
 
-## 📸 效果展示
-<img width="1370" height="815" alt="faec3c47076a1febc4e78b21814e1a55" src="https://github.com/user-attachments/assets/16667eff-fd7d-44ea-857f-8fa578816c2a" />
-## ✨ 功能特性
-> 侵蚀模拟的地形生成
-> 独特的地形纹理算法
+- 根据坡度过滤无意义的平坦区域水滴
+- 提前结束低收益水滴
+- 记录每个区域的侵蚀历史
+- 在 GPU 端收集实验统计数据
+- 减少不必要的高度采样与原子操作
+- 对比不同时间预算下的地形细节保留效果
 
-### 🧪 最新研究进展
+同一测试场景下的历史优化记录：
 
-侵蚀计算着色器现在会记录每个地形位置累计的水滴侵蚀次数。当同一区域的侵蚀累积过多时，后续水滴会提前退出模拟，避免大量水滴在平原区域反复堆积并产生无效计算。
+```text
+4.886600 s → 3.957070 s → 1.700000 s → 1.039470 s
+```
 
-- **优化前：** `4.886600 s`
-- **优化后：** `3.95707 s`
-- **性能提升：** GPU 侵蚀计算速度约提升 `19%`
+实际性能会受到显卡功耗模式、地形尺寸、水滴数量和着色器参数影响。
 
+## 后续计划
 
-### 重要里程碑
-- **第一阶段**：基础Vulkan环境搭建（SDL3 + Vulkan），实现简单三角形渲染
-- **第二阶段**：使用FastNoiseLite生成地形，多层噪声叠加
-- **第三阶段**：CPU端水力侵蚀模拟（后被GPU版本替代）
-- **第四阶段**：GPU计算着色器实现侵蚀，支持水滴并行模拟
-- **第五阶段**：基于坡度、高度、水流量的高级纹理混合
-- **第六阶段**：（计划中）实现无限地形区块加载
+- FFT 海洋模拟
+- 优化阴影稳定性与阴影过滤
+- 完善 PBR 材质效果
+- 雨水、潮湿地表与积水效果
+- 河流、湖泊、海岸与沙滩
+- 树木、草地和生物群系系统
+- 体积云与天气系统
+- 地形区块加载与 LOD
+- 更完整的侵蚀质量评估工具
 
+## 编译
 
-### 🔮 计划中
-- **第六阶段**：无限地形区块加载（LOD）
-- **第七阶段**：树木与草地植被系统
-- **第八阶段**：湖泊与海洋渲染
-- **第九阶段**：动态云层系统
-
-
-### 关于代码的一些说明
-> `lve_model.cpp` 中保留了被注释掉的CPU侵蚀代码，这是最初实现方案的遗留。
-> 保留它一方面是为了展示学习路径，另一方面也方便将来做性能对比。
-> 
-
-
-## 🛠️ 编译构建
 ### 依赖库
-- [SDL3](https://github.com/libsdl-org/SDL) — 窗口与输入管理
-- [Vulkan SDK](https://vulkan.lunarg.com/) — 图形与计算 API
-- [GLM](https://github.com/g-truc/glm) — 数学运算库
-- [FastNoiseLite](https://github.com/Auburn/FastNoiseLite) — 程序化噪声生成
 
+- [Vulkan SDK](https://vulkan.lunarg.com/)
+- [SDL3](https://github.com/libsdl-org/SDL)
+- [GLM](https://github.com/g-truc/glm)
+- [FastNoiseLite](https://github.com/Auburn/FastNoiseLite)
+- Dear ImGui
+
+运行前先编译 GLSL 着色器：
+
+```bat
+compile.bat
+```
+
+然后使用 Visual Studio 编译 Vulkan 解决方案。
