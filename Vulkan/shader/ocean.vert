@@ -1,5 +1,5 @@
 #version 450
-
+#extension GL_KHR_vulkan_glsl : enable
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inColor;
 layout(location = 2) in vec3 inNormal;
@@ -27,64 +27,50 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
 
 // set = 1：Ocean 类自己创建的 IFFT 高度图
 layout(set = 1, binding = 0)
-uniform sampler2D oceanHeightMap;
+uniform sampler2D oceanHeightMap;//高度图,单纯垂直移动顶点
 
+layout(set = 1, binding = 1)
+uniform sampler2D oceanDisplacementXMap;//和下面都是专门用来水平移动顶点的
+
+layout(set = 1, binding = 2)
+uniform sampler2D oceanDisplacementYMap;
 
 // 必须与 OceanPushConstant 完全一致：16 字节
 layout(push_constant) uniform OceanPushConstant {
     float oceanRange;
     float heightScale;
-    float padding0;
-    float padding1;
+    float horizontalScale;
+    float padding;
 } pc;
 float sampleOceanHeight(vec2 uv) {// 采样 oceanHeightMap，返回高度值
     return texture(oceanHeightMap, uv).r *
         pc.heightScale;
 }
-vec3 calculateOceanNormal(vec2 oceanUV) {//计算法线
+
+vec3 sampleOceanSurface(vec2 oceanUV) {
+    float height = sampleOceanHeight(oceanUV);
+    vec2 horizontalDisplacement = vec2(
+        texture(oceanDisplacementXMap, oceanUV).r,
+        texture(oceanDisplacementYMap, oceanUV).r
+    ) * pc.horizontalScale;
+
+    vec2 basePosition =
+        (oceanUV - vec2(0.5)) * pc.oceanRange;
+
+    return vec3(basePosition + horizontalDisplacement, height);
+}
+
+vec3 calculateOceanNormal(vec2 oceanUV) {//计算包含水平位移的真实法线
     vec2 texelSize =
         1.0 /
         vec2(textureSize(oceanHeightMap, 0));
 
-    float heightLeft =
-        sampleOceanHeight(
-            oceanUV - vec2(texelSize.x, 0.0)
-        );
+    vec3 left = sampleOceanSurface(oceanUV - vec2(texelSize.x, 0.0));
+    vec3 right = sampleOceanSurface(oceanUV + vec2(texelSize.x, 0.0));
+    vec3 down = sampleOceanSurface(oceanUV - vec2(0.0, texelSize.y));
+    vec3 up = sampleOceanSurface(oceanUV + vec2(0.0, texelSize.y));
 
-    float heightRight =
-        sampleOceanHeight(
-            oceanUV + vec2(texelSize.x, 0.0)
-        );
-
-    float heightDown =
-        sampleOceanHeight(
-            oceanUV - vec2(0.0, texelSize.y)
-        );
-
-    float heightUp =
-        sampleOceanHeight(
-            oceanUV + vec2(0.0, texelSize.y)
-        );
-
-    float worldTexelSize =
-        pc.oceanRange /
-        float(textureSize(oceanHeightMap, 0).x);
-
-    float heightGradientX =
-        (heightRight - heightLeft) /
-        (2.0 * worldTexelSize);
-
-    float heightGradientY =
-        (heightUp - heightDown) /
-        (2.0 * worldTexelSize);
-
-    return normalize(
-        vec3(
-            -heightGradientX,
-            -heightGradientY,
-            1.0
-        )
-    );
+    return normalize(cross(right - left, up - down));
 }
 void main() {
     // Ocean::createMesh() 创建的初始平面顶点
@@ -100,6 +86,23 @@ void main() {
     // IFFT 高度图：R 通道就是最终海浪高度
     float oceanHeight =
     sampleOceanHeight(oceanUV);
+
+    float displacementX =
+    texture(
+        oceanDisplacementXMap,
+        oceanUV
+    ).r * pc.horizontalScale;
+
+    float displacementY =
+        texture(
+            oceanDisplacementYMap,
+            oceanUV
+        ).r * pc.horizontalScale;
+
+    worldPosition.xy += vec2(
+        displacementX,
+        displacementY
+    );
 
     worldPosition.z += oceanHeight;
 

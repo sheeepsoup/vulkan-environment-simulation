@@ -3,12 +3,14 @@
 #include <array>
 #include <fstream>
 #include <stdexcept>
-
+bool seePoint = false;
 namespace ocean {
 
 	Ocean::Ocean(
 		lve::LveDevice& lveDevice,
-		const ifft::IFFT& ifftObj,
+		const ifft::IFFT& heightIFFT,
+		const ifft::IFFT& displacementXIFFT,
+		const ifft::IFFT& displacementYIFFT,
 		VkRenderPass renderPass,
 		VkDescriptorSetLayout globalDescriptorSetLayout,
 		const std::string& vertexShaderPath,
@@ -16,7 +18,9 @@ namespace ocean {
 		uint32_t meshResolution,
 		float oceanRange)
 		: lveDevice{ lveDevice },
-		ifftObj{ ifftObj },
+		heightIFFT{ heightIFFT },
+		displacementXIFFT{ displacementXIFFT },
+		displacementYIFFT{ displacementYIFFT },
 		meshResolution{ meshResolution },
 		oceanRange{ oceanRange } {
 
@@ -200,33 +204,38 @@ namespace ocean {
 	}
 
 	void Ocean::createDescriptorSetLayout() {
-		VkDescriptorSetLayoutBinding heightMapBinding{};
+		std::array<VkDescriptorSetLayoutBinding, 3> bindings{};
 
-		heightMapBinding.binding = 0;
-		heightMapBinding.descriptorType =
-			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		for (uint32_t i = 0; i < 3; i++) {
+			bindings[i].binding = i;
+			bindings[i].descriptorType =
+				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
-		heightMapBinding.descriptorCount = 1;
+			bindings[i].descriptorCount = 1;
 
-		heightMapBinding.stageFlags =
-			VK_SHADER_STAGE_VERTEX_BIT |
-			VK_SHADER_STAGE_FRAGMENT_BIT;
+			bindings[i].stageFlags =
+				VK_SHADER_STAGE_VERTEX_BIT |
+				VK_SHADER_STAGE_FRAGMENT_BIT;
+		}
 
 		VkDescriptorSetLayoutCreateInfo layoutInfo{};
 		layoutInfo.sType =
 			VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 
-		layoutInfo.bindingCount = 1;
-		layoutInfo.pBindings = &heightMapBinding;
+		layoutInfo.bindingCount =
+			static_cast<uint32_t>(bindings.size());
+
+		layoutInfo.pBindings = bindings.data();
 
 		if (vkCreateDescriptorSetLayout(
 			lveDevice.getDevice(),
 			&layoutInfo,
 			nullptr,
-			&descriptorSetLayout) != VK_SUCCESS) {
-
+			&descriptorSetLayout
+		) != VK_SUCCESS) {
 			throw std::runtime_error(
-				"failed to create ocean descriptor set layout!");
+				"failed to create ocean descriptor set layout!"
+			);
 		}
 	}
 
@@ -235,7 +244,7 @@ namespace ocean {
 		poolSize.type =
 			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
-		poolSize.descriptorCount = 1;
+		poolSize.descriptorCount = 3;
 
 		VkDescriptorPoolCreateInfo poolInfo{};
 		poolInfo.sType =
@@ -268,41 +277,60 @@ namespace ocean {
 		if (vkAllocateDescriptorSets(
 			lveDevice.getDevice(),
 			&allocInfo,
-			&descriptorSet) != VK_SUCCESS) {
-
+			&descriptorSet
+		) != VK_SUCCESS) {
 			throw std::runtime_error(
-				"failed to allocate ocean descriptor set!");
+				"failed to allocate ocean descriptor set!"
+			);
 		}
 
-		VkDescriptorImageInfo heightMapInfo{};
-		heightMapInfo.imageLayout =
+		VkDescriptorImageInfo imageInfos[3]{};
+
+		imageInfos[0].imageLayout =
 			VK_IMAGE_LAYOUT_GENERAL;
-
-		heightMapInfo.imageView =
-			ifftObj.getHeightMapImageView();
-
-		heightMapInfo.sampler =
+		imageInfos[0].imageView =
+			heightIFFT.getHeightMapImageView();
+		imageInfos[0].sampler =
 			heightMapSampler;
 
-		VkWriteDescriptorSet write{};
-		write.sType =
-			VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		imageInfos[1].imageLayout =
+			VK_IMAGE_LAYOUT_GENERAL;
+		imageInfos[1].imageView =
+			displacementXIFFT.getHeightMapImageView();
+		imageInfos[1].sampler =
+			heightMapSampler;
 
-		write.dstSet = descriptorSet;
-		write.dstBinding = 0;
+		imageInfos[2].imageLayout =
+			VK_IMAGE_LAYOUT_GENERAL;
+		imageInfos[2].imageView =
+			displacementYIFFT.getHeightMapImageView();
+		imageInfos[2].sampler =
+			heightMapSampler;
 
-		write.descriptorType =
-			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		std::array<VkWriteDescriptorSet, 3> writes{};
 
-		write.descriptorCount = 1;
-		write.pImageInfo = &heightMapInfo;
+		for (uint32_t i = 0; i < 3; i++) {
+			writes[i].sType =
+				VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+
+			writes[i].dstSet = descriptorSet;
+			writes[i].dstBinding = i;
+			writes[i].dstArrayElement = 0;
+
+			writes[i].descriptorType =
+				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+
+			writes[i].descriptorCount = 1;
+			writes[i].pImageInfo = &imageInfos[i];
+		}
 
 		vkUpdateDescriptorSets(
 			lveDevice.getDevice(),
-			1,
-			&write,
+			static_cast<uint32_t>(writes.size()),
+			writes.data(),
 			0,
-			nullptr);
+			nullptr
+		);
 	}
 
 	void Ocean::createGraphicsPipeline(
@@ -383,10 +411,11 @@ namespace ocean {
 		rasterizer.sType =
 			VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
 
-		rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+		if(!seePoint)rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+		if(seePoint)rasterizer.polygonMode = VK_POLYGON_MODE_LINE;//看顶点的
 		rasterizer.lineWidth = 1.0f;
-		rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-
+		if(!seePoint)rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+		if(seePoint)rasterizer.cullMode = VK_CULL_MODE_NONE;//看顶点的
 		rasterizer.frontFace =
 			VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
@@ -518,37 +547,48 @@ namespace ocean {
 	}
 
 	void Ocean::recordHeightMapReadyForGraphics(
-		VkCommandBuffer commandBuffer) const {
+		VkCommandBuffer commandBuffer
+	) const {
+		std::array<VkImage, 3> images = {
+			heightIFFT.getHeightMapImage(),
+			displacementXIFFT.getHeightMapImage(),
+			displacementYIFFT.getHeightMapImage()
+		};
 
-		VkImageMemoryBarrier barrier{};
-		barrier.sType =
-			VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		std::array<VkImageMemoryBarrier, 3> barriers{};
 
-		barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-		barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+		for (uint32_t i = 0; i < 3; i++) {
+			barriers[i].sType =
+				VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 
-		barrier.srcQueueFamilyIndex =
-			VK_QUEUE_FAMILY_IGNORED;
+			barriers[i].oldLayout =
+				VK_IMAGE_LAYOUT_GENERAL;
 
-		barrier.dstQueueFamilyIndex =
-			VK_QUEUE_FAMILY_IGNORED;
+			barriers[i].newLayout =
+				VK_IMAGE_LAYOUT_GENERAL;
 
-		barrier.image =
-			ifftObj.getHeightMapImage();
+			barriers[i].srcQueueFamilyIndex =
+				VK_QUEUE_FAMILY_IGNORED;
 
-		barrier.subresourceRange.aspectMask =
-			VK_IMAGE_ASPECT_COLOR_BIT;
+			barriers[i].dstQueueFamilyIndex =
+				VK_QUEUE_FAMILY_IGNORED;
 
-		barrier.subresourceRange.baseMipLevel = 0;
-		barrier.subresourceRange.levelCount = 1;
-		barrier.subresourceRange.baseArrayLayer = 0;
-		barrier.subresourceRange.layerCount = 1;
+			barriers[i].image = images[i];
 
-		barrier.srcAccessMask =
-			VK_ACCESS_SHADER_WRITE_BIT;
+			barriers[i].subresourceRange.aspectMask =
+				VK_IMAGE_ASPECT_COLOR_BIT;
 
-		barrier.dstAccessMask =
-			VK_ACCESS_SHADER_READ_BIT;
+			barriers[i].subresourceRange.baseMipLevel = 0;
+			barriers[i].subresourceRange.levelCount = 1;
+			barriers[i].subresourceRange.baseArrayLayer = 0;
+			barriers[i].subresourceRange.layerCount = 1;
+
+			barriers[i].srcAccessMask =
+				VK_ACCESS_SHADER_WRITE_BIT;
+
+			barriers[i].dstAccessMask =
+				VK_ACCESS_SHADER_READ_BIT;
+		}
 
 		vkCmdPipelineBarrier(
 			commandBuffer,
@@ -558,13 +598,16 @@ namespace ocean {
 			0,
 			0, nullptr,
 			0, nullptr,
-			1, &barrier);
+			static_cast<uint32_t>(barriers.size()),
+			barriers.data()
+		);
 	}
 
 	void Ocean::draw(
 		VkCommandBuffer commandBuffer,
 		VkDescriptorSet globalDescriptorSet,
-		float heightScale) {
+		float heightScale,
+		float horizontalScale) {
 
 		vkCmdBindPipeline(
 			commandBuffer,
@@ -596,7 +639,7 @@ namespace ocean {
 		OceanPushConstant pushConstant{};
 		pushConstant.oceanRange = oceanRange;
 		pushConstant.heightScale = heightScale;
-
+		pushConstant.horizontalScale = horizontalScale;
 		vkCmdPushConstants(
 			commandBuffer,
 			pipelineLayout,

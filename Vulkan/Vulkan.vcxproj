@@ -209,8 +209,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="compile.bat" />
-    <None Include="displacement.comp" />
     <None Include="shader\compute.comp" />
+    <None Include="shader\displacement.comp" />
     <None Include="shader\evolution.comp" />
     <None Include="shader\ifft.comp" />
     <None Include="shader\ocean.frag" />

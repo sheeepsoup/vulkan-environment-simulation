@@ -15,15 +15,17 @@ namespace ocean {
 	struct OceanPushConstant {
 		float oceanRange;
 		float heightScale;
-		float padding0;
-		float padding1;
+		float horizontalScale;
+		float padding;
 	};
 
 	class Ocean {
 	public:
 		Ocean(
 			lve::LveDevice& lveDevice,
-			const ifft::IFFT& ifftObj,
+			const ifft::IFFT& heightIFFT,
+			const ifft::IFFT& displacementXIFFT,
+			const ifft::IFFT& displacementYIFFT,
 			VkRenderPass renderPass,
 			VkDescriptorSetLayout globalDescriptorSetLayout,
 			const std::string& vertexShaderPath,
@@ -45,7 +47,9 @@ namespace ocean {
 		void draw(
 			VkCommandBuffer commandBuffer,
 			VkDescriptorSet globalDescriptorSet,
-			float heightScale);
+			float heightScale,
+			float horizontalScale
+		);
 
 		float getOceanRange() const {
 			return oceanRange;
@@ -74,7 +78,9 @@ namespace ocean {
 			const std::vector<char>& code) const;
 
 		lve::LveDevice& lveDevice;
-		const ifft::IFFT& ifftObj;
+		const ifft::IFFT& heightIFFT;
+		const ifft::IFFT& displacementXIFFT;
+		const ifft::IFFT& displacementYIFFT;
 
 		lve::LveModel model;
 

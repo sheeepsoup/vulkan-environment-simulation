@@ -247,6 +247,8 @@
     <None Include="shader\ocean.vert">
       <Filter>资源文件\shader\ocean</Filter>
     </None>
-    <None Include="displacement.comp" />
+    <None Include="shader\displacement.comp">
+      <Filter>资源文件\shader\ocean</Filter>
+    </None>
   </ItemGroup>
 </Project>

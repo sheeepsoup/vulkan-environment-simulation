@@ -13,7 +13,7 @@ if not exist "%GLSLC%" (
 
 echo Removing UTF-8 BOM...
 
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$files = @('shader\simple_shader.vert','shader\simple_shader.frag','shader\compute.comp','shader\slope.comp','shader\shadow.vert','shader\spectrum.comp','shader\evolution.comp','shader\ifft.comp','shader\ocean.vert','shader\ocean.frag'); foreach ($relativePath in $files) { $path = Join-Path (Get-Location) $relativePath; if (-not (Test-Path -LiteralPath $path)) { Write-Host ('[Missing]     ' + $relativePath); continue }; $bytes = [System.IO.File]::ReadAllBytes($path); if ($bytes.Length -ge 3 -and $bytes[0] -eq 239 -and $bytes[1] -eq 187 -and $bytes[2] -eq 191) { $result = New-Object byte[] ($bytes.Length - 3); [Array]::Copy($bytes, 3, $result, 0, $result.Length); [System.IO.File]::WriteAllBytes($path, $result); Write-Host ('[BOM removed] ' + $relativePath) } else { Write-Host ('[No BOM]      ' + $relativePath) } }"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$files = @('shader\simple_shader.vert','shader\simple_shader.frag','shader\compute.comp','shader\slope.comp','shader\shadow.vert','shader\spectrum.comp','shader\evolution.comp','shader\ifft.comp','shader\displacement.comp','shader\ocean.vert','shader\ocean.frag'); foreach ($relativePath in $files) { $path = Join-Path (Get-Location) $relativePath; if (-not (Test-Path -LiteralPath $path)) { Write-Host ('[Missing]     ' + $relativePath); continue }; $bytes = [System.IO.File]::ReadAllBytes($path); if ($bytes.Length -ge 3 -and $bytes[0] -eq 239 -and $bytes[1] -eq 187 -and $bytes[2] -eq 191) { $result = New-Object byte[] ($bytes.Length - 3); [Array]::Copy($bytes, 3, $result, 0, $result.Length); [System.IO.File]::WriteAllBytes($path, $result); Write-Host ('[BOM removed] ' + $relativePath) } else { Write-Host ('[No BOM]      ' + $relativePath) } }"
 
 echo.
 echo Compiling terrain vertex shader...
@@ -46,6 +46,10 @@ if errorlevel 1 goto compile_failed
 
 echo Compiling IFFT compute shader...
 "%GLSLC%" "shader\ifft.comp" -o "shader\ifft.comp.spv"
+if errorlevel 1 goto compile_failed
+
+echo Compiling displacement compute shader...
+"%GLSLC%" "shader\displacement.comp" -o "shader\displacement.comp.spv"
 if errorlevel 1 goto compile_failed
 
 echo Compiling ocean vertex shader...

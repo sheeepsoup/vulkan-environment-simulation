@@ -1,0 +1,95 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+// Evolution 输出的 H(k, t)
+layout(binding = 0, rg32f)
+uniform readonly image2D htSpectrum;
+
+// X / Y 水平位移频谱
+layout(binding = 1, rg32f)
+uniform writeonly image2D displacementXSpectrum;
+
+layout(binding = 2, rg32f)
+uniform writeonly image2D displacementYSpectrum;
+
+layout(push_constant) uniform DisplacementPushConstant {
+    uint resolution;
+    uint oceanRange;
+    float choppiness;
+    float padding;
+} pc;
+
+const float PI = 3.14159265;
+
+// -i * (a + bi) = b - ai
+vec2 multiplyByMinusI(vec2 value) {
+    return vec2(value.y, -value.x);
+}
+
+void main() {
+    uvec2 pixel = gl_GlobalInvocationID.xy;
+
+    if (pixel.x >= pc.resolution ||
+        pixel.y >= pc.resolution) {
+        return;
+    }
+
+    ivec2 grid =
+        ivec2(pixel) -
+        ivec2(pc.resolution / 2);
+
+    float deltaK =
+        2.0 * PI /
+        float(pc.oceanRange);
+
+    vec2 k = vec2(grid) * deltaK;
+    float kLength = length(k);
+
+    if (kLength < 0.00001) {
+        imageStore(
+            displacementXSpectrum,
+            ivec2(pixel),
+            vec4(0.0)
+        );
+
+        imageStore(
+            displacementYSpectrum,
+            ivec2(pixel),
+            vec4(0.0)
+        );
+
+        return;
+    }
+
+    vec2 hkt =
+        imageLoad(
+            htSpectrum,
+            ivec2(pixel)
+        ).rg;
+
+    vec2 rotatedWave =
+        multiplyByMinusI(hkt);
+
+    vec2 dx =
+        rotatedWave *
+        (k.x / kLength) *
+        pc.choppiness;
+
+    vec2 dy =
+        rotatedWave *
+        (k.y / kLength) *
+        pc.choppiness;
+
+    imageStore(
+        displacementXSpectrum,
+        ivec2(pixel),
+        vec4(dx, 0.0, 0.0)
+    );
+
+    imageStore(
+        displacementYSpectrum,
+        ivec2(pixel),
+        vec4(dy, 0.0, 0.0)
+    );
+}

@@ -29,6 +29,7 @@ ifft.comp的butterfly算法自己优化重构一下
 #include "shadow.h"
 #include"evolution.h"
 #include"ocean.h"
+#include"displacement.h"
 #include"ifft.h"
 #include <set>
 #include<vector>
@@ -50,12 +51,17 @@ const uint32_t oceanMeshResolution =spectrumResolution + 1; //海洋mesh分辨�
 
 const float spectrumRange = 200.0f;//频谱图范围
 const float oceanMeshRange = 200.0f;//海洋mesh范围
-float oceanHeight = 1.0f;//海浪高度,越高越明显
+float oceanHeight = 1.0f; // 海浪垂直高度缩放
+float oceanChoppiness = 3.0f; // 横向挤压系数：越大浪峰越尖，过高会使网格交叉
+float horizontal_displacement_intensity = 1.0f; // 最终水平位移缩放
+float oceanTimeScale = 1.0f; // 海浪演变速度
+spectrum::SpectrumSettings oceanSpectrumSettings{}; // 只在重新生成初始频谱 h0 时应用
+bool g_regenerateOceanSpectrum = false;
 //----------------------------------------------------------------------------------------
 //本地无限地形生成开关
 bool unlimitedArea = false;
 //----------------------------------------------------------------------------------------
-lve::LveWindows win(1366,768,"从零开始的vulkan生活");//窗口
+lve::LveWindows win(2400,1800,"从零开始的vulkan生活");//窗口
 lve::Lvepipeline pipeLine("shader/simple_shader.vert.spv", "shader/simple_shader.frag.spv");
 lve::LveDevice device;
 lve::LveSwapChain swapChain;
@@ -72,6 +78,9 @@ std::unique_ptr<evolution::Evolution> evolutionObj;//与下同   [海水演变�
 std::unique_ptr<spectrum::Spectrum> spectrumObj;//构造在下面main海水部分里面,防止device未初始化报错   [海水海浪频谱图生成]
 std::unique_ptr<ifft::IFFT> ifftObj;//ifft生成海浪高度图
 std::unique_ptr<ocean::Ocean> oceanObj;//海洋
+std::unique_ptr<displacement::Displacement>displacementObj;
+std::unique_ptr<ifft::IFFT>displacementXIFFTObj;
+std::unique_ptr<ifft::IFFT>displacementYIFFTObj;
 
 uint32_t currentFrame = 0;//当前帧
 
@@ -270,6 +279,9 @@ void clean() {
 	ImGui::DestroyContext();
 	shadowObj.clean();
 	oceanObj.reset();
+	displacementYIFFTObj.reset();
+	displacementXIFFTObj.reset();
+	displacementObj.reset();
 	ifftObj.reset();
 	evolutionObj.reset();
 	spectrumObj->clean();
@@ -473,10 +485,12 @@ int main() {
 
 	//生成海洋-------------------------------------------------------------------------------------------------------------
 	spectrumObj = std::make_unique<spectrum::Spectrum>(device,"shader/spectrum.comp.spv", spectrumResolution,spectrumRange);//这构造,防止上面未初始化device报错
-	spectrumObj->generateInitialSpectrum();//创建频谱图,[路径][分辨率]
+	spectrumObj->generateInitialSpectrum(oceanSpectrumSettings);//创建频谱图,[路径][分辨率]
 	evolutionObj = std::make_unique<evolution::Evolution>(device,*spectrumObj,"shader/evolution.comp.spv",spectrumResolution,spectrumRange);//海水演变
-	ifftObj = std::make_unique<ifft::IFFT>(device,*evolutionObj,"shader/ifft.comp.spv",spectrumResolution);
-
+	ifftObj = std::make_unique<ifft::IFFT>(device,evolutionObj->getHtSpectrumImageView(),"shader/ifft.comp.spv",spectrumResolution);
+	displacementObj =std::make_unique<displacement::Displacement>(device,*evolutionObj,"shader/displacement.comp.spv",spectrumResolution,static_cast<uint32_t>(spectrumRange));
+	displacementXIFFTObj =std::make_unique<ifft::IFFT>(device,displacementObj->getDisplacementXView(),"shader/ifft.comp.spv",spectrumResolution);
+	displacementYIFFTObj =std::make_unique<ifft::IFFT>(device,displacementObj->getDisplacementYView(),"shader/ifft.comp.spv",spectrumResolution);
 	//terrain.processOcean();[改成新管线的了]
 	//-------------------------------------------------------------------------------------------------------------
 	//放大地形
@@ -503,6 +517,8 @@ int main() {
 	oceanObj = std::make_unique<ocean::Ocean>(
 		device,
 		*ifftObj,
+		*displacementXIFFTObj,
+		*displacementYIFFTObj,
 		renderPass.getRenderPass(),
 		uniform.getDescriptorSetLayout(),
 		"shader/ocean.vert.spv",
@@ -644,44 +660,81 @@ int main() {
 		ImGui_ImplSDL3_NewFrame();
 		ImGui::NewFrame();
 		if (showCurios) {
-			ImGui::Begin("Water Drop Research");
+			ImGui::Begin("Environment Debug");
 			ImGui::SetWindowFontScale(1.5f);
 
 			ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-			ImGui::Text("totalCandidates: %u", researchStats.totalCandidates);
-			ImGui::Text("erosionSkipped: %u", researchStats.erosionSkipped);
-			ImGui::Text("flatSlopeStopped: %u", researchStats.flatSlopeStopped);
 
-			ImGui::Separator();
+			if (ImGui::BeginTabBar("EnvironmentTabs")) {
+				if (ImGui::BeginTabItem("Terrain")) {
+					ImGui::Text("GPU Erosion Research");
+					ImGui::Separator();
 
-			// ★ 侵蚀次数滑块
-			ImGui::SliderInt("Erosion Extent", &g_erosionExtent, 100000, 5000000, "%d");
+					ImGui::Text("totalCandidates: %u", researchStats.totalCandidates);
+					ImGui::Text("erosionSkipped: %u", researchStats.erosionSkipped);
+					ImGui::Text("flatSlopeStopped: %u", researchStats.flatSlopeStopped);
 
-			// ★ 重跑按钮
-			if (ImGui::Button("Rerun Erosion")) {
-				g_rerunErosion = true;
+					ImGui::Separator();
+					ImGui::SliderInt("Erosion Extent", &g_erosionExtent, 100000, 5000000, "%d");
+
+					if (ImGui::Button("Rerun Erosion")) {
+						g_rerunErosion = true;
+					}
+
+					ImGui::Separator();
+					ImGui::InputInt("Seed", &g_seed);
+					ImGui::SameLine();
+					if (ImGui::Button("Regenerate Terrain")) {
+						g_regenTerrain = true;
+					}
+
+					ImGui::Separator();
+					ImGui::SliderFloat("Shadow Bias", &bias, 0.0f, 0.02f, "%.5f");
+					ImGui::SliderFloat("Light Direction X", &lightDir.x, -1.0f, 1.0f, "%.3f");
+					ImGui::SliderFloat("Light Direction Y", &lightDir.y, -1.0f, 1.0f, "%.3f");
+					ImGui::SliderFloat("Light Direction Z", &lightDir.z, -1.0f, 1.0f, "%.3f");
+
+					ImGui::EndTabItem();
+				}
+
+				if (ImGui::BeginTabItem("Ocean")) {
+					ImGui::Text("FFT Ocean Debug");
+					ImGui::Separator();
+
+					ImGui::SliderFloat("Wave Height", &oceanHeight, 0.0f, 4.0f, "%.3f");
+					ImGui::SliderFloat("Choppiness", &oceanChoppiness, 0.0f, 10.0f, "%.3f");
+					ImGui::SliderFloat("Horizontal Displacement", &horizontal_displacement_intensity, 0.0f, 3.0f, "%.3f");
+					ImGui::SliderFloat("Time Scale", &oceanTimeScale, 0.0f, 3.0f, "%.3f");
+
+					ImGui::Separator();
+					ImGui::Text("Initial Spectrum (JONSWAP)");
+					ImGui::SliderFloat2("Wind Direction", &oceanSpectrumSettings.windDirection.x, -1.0f, 1.0f, "%.3f");
+					ImGui::SliderFloat("Wind Speed", &oceanSpectrumSettings.windSpeed, 1.0f, 30.0f, "%.2f");
+					ImGui::SliderFloat("Fetch", &oceanSpectrumSettings.fetch, 100.0f, 50000.0f, "%.0f");
+					ImGui::SliderFloat("JONSWAP Gamma", &oceanSpectrumSettings.gamma, 1.0f, 7.0f, "%.2f");
+					ImGui::SliderFloat("Directionality", &oceanSpectrumSettings.directionalExponent, 0.0f, 12.0f, "%.2f");
+					ImGui::SliderFloat("High Frequency Cutoff", &oceanSpectrumSettings.highFrequencyCutoff, 0.1f, 5.0f, "%.2f");
+					ImGui::SliderFloat("Spectrum Amplitude", &oceanSpectrumSettings.amplitudeScale, 0.05f, 1.5f, "%.3f");
+					ImGui::SliderFloat("Cross Swell Weight", &oceanSpectrumSettings.crossSwellWeight, 0.0f, 1.0f, "%.2f");
+					ImGui::SliderFloat("Cross Swell Angle", &oceanSpectrumSettings.crossSwellAngleDegrees, -180.0f, 180.0f, "%.1f deg");
+
+					if (ImGui::Button("Regenerate Initial Spectrum")) {
+						g_regenerateOceanSpectrum = true;
+					}
+					ImGui::TextDisabled("The sliders above take effect only after pressing this button.");
+
+					ImGui::Separator();
+					ImGui::Text("Spectrum: %u x %u", spectrumResolution, spectrumResolution);
+					ImGui::Text("Spectrum Range: %.1f", spectrumRange);
+					ImGui::Text("Mesh: %u x %u", oceanMeshResolution, oceanMeshResolution);
+					ImGui::Text("Mesh Range: %.1f", oceanMeshRange);
+					ImGui::TextDisabled("Wireframe is a pipeline creation option; restart after changing seePoint.");
+
+					ImGui::EndTabItem();
+				}
+
+				ImGui::EndTabBar();
 			}
-			ImGui::Separator();
-
-			// ★ 种子
-			ImGui::InputInt("Seed", &g_seed);
-			ImGui::SameLine();
-			if (ImGui::Button("Regenerate")) {
-				g_regenTerrain = true;
-			}
-
-			ImGui::Separator();
-			// ★ 显示当前状态
-			ImGui::SameLine();
-			ImGui::Text("(current: %d)", g_erosionExtent);
-
-			ImGui::Separator();
-
-			ImGui::SliderFloat("bias", &bias, 0.0f, 0.02f, "%.5f");
-			ImGui::SliderFloat("lightDirX", &lightDir.x, -1.0f, 1.0f, "%.5f");
-			ImGui::SliderFloat("lightDirY", &lightDir.y, -1.0f, 1.0f, "%.5f");
-			ImGui::SliderFloat("lightDirZ", &lightDir.z, -1.0f, 1.0f, "%.5f");
-
 
 			ImGui::TextUnformatted("Press TAB to close UI");
 			ImGui::End();
@@ -698,7 +751,15 @@ int main() {
 		renderer.run(device.getDevice(), swapChain, device.getGraphicsQueue(), device.getPresentQueue(),
 			currentFrame, renderPass.getRenderPass(),model,uniform.getDescriptorSets(),pipeLine.getPipelineLayout(),
 			uniform, modelMatrix,camera.getView(),camera.getProjection(),compute,camera.getPos(),terrain.getIndices(),terrain, cameraMaxSeeDistance, shadowObj,
-			lightViewProj, glm::vec4(bias, lightDir), *evolutionObj, static_cast<float>(currentTime) / 1000.0f,*ifftObj,*oceanObj,oceanHeight);
+			lightViewProj, glm::vec4(bias, lightDir), *evolutionObj, static_cast<float>(currentTime) / 1000.0f * oceanTimeScale,*ifftObj,*oceanObj,oceanHeight, *displacementObj,
+			*displacementXIFFTObj,*displacementYIFFTObj, horizontal_displacement_intensity,oceanChoppiness);
+
+		// 频谱图被当前帧读取过后才允许覆盖它；只会在点击按钮时短暂停一次。
+		if (g_regenerateOceanSpectrum) {
+			g_regenerateOceanSpectrum = false;
+			vkDeviceWaitIdle(device.getDevice());
+			spectrumObj->generateInitialSpectrum(oceanSpectrumSettings);
+		}
 		
 		if (g_rerunErosion) {
 			g_rerunErosion = false;

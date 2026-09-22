@@ -489,7 +489,21 @@ namespace spectrum {
 			spectrumImageMemory = VK_NULL_HANDLE;
 		}
 	}
-	void Spectrum::generateInitialSpectrum() {
+	void Spectrum::generateInitialSpectrum(const SpectrumSettings& settings) {
+		// 方向为零时 normalize 会产生 NaN，给一个稳定的默认风向。
+		pushConstant.windDirection =
+			glm::length(settings.windDirection) > 0.0001f
+			? glm::normalize(settings.windDirection)
+			: glm::vec2(1.0f, 0.0f);
+		pushConstant.windSpeed = settings.windSpeed;
+		pushConstant.fetch = settings.fetch;
+		pushConstant.gamma = settings.gamma;
+		pushConstant.directionalExponent = settings.directionalExponent;
+		pushConstant.highFrequencyCutoff = settings.highFrequencyCutoff;
+		pushConstant.amplitudeScale = settings.amplitudeScale;
+		pushConstant.crossSwellWeight = settings.crossSwellWeight;
+		pushConstant.crossSwellAngleDegrees = settings.crossSwellAngleDegrees;
+
 		VkCommandBufferAllocateInfo allocInfo{};
 		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		allocInfo.commandPool = lveDevice.getCommandPool();

@@ -25,7 +25,12 @@ namespace lve {
 	class LveDevice
 	{
 	public:
-		
+		VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
+		VkCommandBuffer beginSingleTimeCommands();
+
+		void endSingleTimeCommands(
+			VkCommandBuffer commandBuffer
+		);
 		void createInstance();
 		void pickPhysicalDevice();
 		void createQueueFamiliesIndices(LveWindows& win);
@@ -54,8 +59,14 @@ namespace lve {
 		VkFormat findDepthFormat();//查询物理设备支持的深度格式
 		void createImage(uint32_t width,uint32_t height,VkFormat format,VkImageTiling tiling,VkImageUsageFlags usage,
 			VkMemoryPropertyFlags properties,VkImage& image,VkDeviceMemory& imageMemory);
-
-		VkImageView createImageView(VkImage image,VkFormat format,VkImageAspectFlags aspectFlags);
+		uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);//查找内存类型
+		void transitionImageLayout(
+			VkImage image,
+			VkFormat format,
+			VkImageLayout oldLayout,
+			VkImageLayout newLayout
+		);//转换图像布局
+	
 	private:
 
 		VkInstance instance = VK_NULL_HANDLE;//vk实例
@@ -76,7 +87,7 @@ namespace lve {
 		bool isDeviceSuitable2(VkPhysicalDevice device, LveWindows& win);
 	
 		bool checkDeviceExtensionSupport(VkPhysicalDevice device);
-		uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);//查找内存类型
+	
 
 		VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);//寻找支持的模式[例如深度缓冲]
 

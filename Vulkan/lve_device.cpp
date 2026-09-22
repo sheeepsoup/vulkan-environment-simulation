@@ -226,6 +226,7 @@ namespace lve {
 		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;//结构体属性
 		createInfo.pQueueCreateInfos = queueCreateInfos.data();//添加队列的属性指针
 		createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());//队列创建信息结构体的数量
+		deviceFeatures.fillModeNonSolid = VK_TRUE;
 		createInfo.pEnabledFeatures = &deviceFeatures;//添加指定的设备功能属性
 		createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());//启用的拓展数量
 		createInfo.ppEnabledExtensionNames = deviceExtensions.data();
@@ -436,7 +437,149 @@ namespace lve {
 			throw std::runtime_error("failed to bind image memory!");
 		}
 	}
+	void LveDevice::endSingleTimeCommands(
+		VkCommandBuffer commandBuffer
+	) {
+		if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+			throw std::runtime_error(
+				"failed to end single-time command buffer"
+			);
+		}
 
+		VkSubmitInfo submitInfo{};
+		submitInfo.sType =
+			VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &commandBuffer;
+
+		if (vkQueueSubmit(
+			getGraphicsQueue(),
+			1,
+			&submitInfo,
+			VK_NULL_HANDLE
+		) != VK_SUCCESS) {
+			throw std::runtime_error(
+				"failed to submit single-time command buffer"
+			);
+		}
+
+		vkQueueWaitIdle(getGraphicsQueue());
+
+		vkFreeCommandBuffers(
+			getDevice(),
+			getCommandPool(),
+			1,
+			&commandBuffer
+		);
+	}
+	VkCommandBuffer LveDevice::beginSingleTimeCommands() {
+		VkCommandBufferAllocateInfo allocInfo{};
+		allocInfo.sType =
+			VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+
+		allocInfo.level =
+			VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+
+		allocInfo.commandPool = getCommandPool();
+		allocInfo.commandBufferCount = 1;
+
+		VkCommandBuffer commandBuffer;
+
+		if (vkAllocateCommandBuffers(
+			getDevice(),
+			&allocInfo,
+			&commandBuffer
+		) != VK_SUCCESS) {
+			throw std::runtime_error(
+				"failed to allocate single-time command buffer"
+			);
+		}
+
+		VkCommandBufferBeginInfo beginInfo{};
+		beginInfo.sType =
+			VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+		beginInfo.flags =
+			VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+		if (vkBeginCommandBuffer(
+			commandBuffer,
+			&beginInfo
+		) != VK_SUCCESS) {
+			throw std::runtime_error(
+				"failed to begin single-time command buffer"
+			);
+		}
+
+		return commandBuffer;
+	}
+	void LveDevice::transitionImageLayout(
+		VkImage image,
+		VkFormat format,
+		VkImageLayout oldLayout,
+		VkImageLayout newLayout
+	) {
+		VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+		VkImageMemoryBarrier barrier{};
+		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+
+		barrier.oldLayout = oldLayout;
+		barrier.newLayout = newLayout;
+
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+		barrier.image = image;
+
+		barrier.subresourceRange.aspectMask =
+			VK_IMAGE_ASPECT_COLOR_BIT;
+
+		barrier.subresourceRange.baseMipLevel = 0;
+		barrier.subresourceRange.levelCount = 1;
+		barrier.subresourceRange.baseArrayLayer = 0;
+		barrier.subresourceRange.layerCount = 1;
+
+		VkPipelineStageFlags sourceStage;
+		VkPipelineStageFlags destinationStage;
+
+		if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+			newLayout == VK_IMAGE_LAYOUT_GENERAL) {
+
+			barrier.srcAccessMask = 0;
+
+			barrier.dstAccessMask =
+				VK_ACCESS_SHADER_READ_BIT |
+				VK_ACCESS_SHADER_WRITE_BIT;
+
+			sourceStage =
+				VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
+			destinationStage =
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+		}
+		else {
+			throw std::runtime_error(
+				"unsupported image layout transition"
+			);
+		}
+
+		vkCmdPipelineBarrier(
+			commandBuffer,
+			sourceStage,
+			destinationStage,
+			0,
+			0,
+			nullptr,
+			0,
+			nullptr,
+			1,
+			&barrier
+		);
+
+		endSingleTimeCommands(commandBuffer);
+	}
 	uint32_t LveDevice::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
 		VkPhysicalDeviceMemoryProperties memProperties;//物理设备内存属性结构体
 		vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);//获取物理设备内存属性

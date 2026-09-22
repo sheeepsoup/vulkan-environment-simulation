@@ -7,18 +7,20 @@ layout(binding = 0, rg32f) uniform writeonly image2D h0Spectrum;
 layout(push_constant) uniform SpectrumPushConstant {
     uint resolution;
     uint oceanRange;
-
+    vec2 windDirection;
+    float windSpeed;
+    float fetch;
+    float gamma;
+    float directionalExponent;
+    float highFrequencyCutoff;
+    float amplitudeScale;
+    float crossSwellWeight;
+    float crossSwellAngleDegrees;
+    float padding;
 } pc;
 
 
 const float PI = 3.14159265;
-vec2 windDirection = vec2(0.9578, 0.2873);//风向[后面塞到push_contant里面]
-float windSpeed = 12.0f;//风速[后面塞到push_content里面]
-float fetch = 10000.0f;//风区长度[后面塞到push_content里面](风在海面吹过的距离,越小海浪越年轻)
-float gamma = 3.3f;//主浪峰的峰尖长度
-
-const float normalizeContent = 6.0;//风向集中程度,越大顺风的浪越明显
-
 //计算频谱图的值[JOSNWARP来算能量]
 float jonswap(float omega,float windSpeed,float fetch,float gamma) {
     const float g = 9.81;
@@ -93,22 +95,38 @@ void main() {
         return;
     }
     vec2 dir = normalize(k);//波的方向
-    float directionFactor = pow(max(dot(dir, windDirection), 0.0), normalizeContent);//风向因子[dot后-1 ->逆风走,能量低 1->顺风走,能量高]
+
+    // 主风浪：保持原来的风向。
+    float primaryDirection =
+        pow(max(dot(dir, pc.windDirection), 0.0), pc.directionalExponent);
+
+    // 交叉涌浪：从主风向偏转一个角度。它和主浪叠加后才会有交叉、干涉的海况。
+    float crossAngle = radians(pc.crossSwellAngleDegrees);
+    vec2 crossWindDirection = vec2(
+        pc.windDirection.x * cos(crossAngle) - pc.windDirection.y * sin(crossAngle),
+        pc.windDirection.x * sin(crossAngle) + pc.windDirection.y * cos(crossAngle)
+    );
+    float crossDirection = pow(
+        max(dot(dir, crossWindDirection), 0.0),
+        max(pc.directionalExponent * 0.55, 1.0)
+    );
+
+    float directionFactor =
+        primaryDirection +
+        crossDirection * pc.crossSwellWeight;
 
     //计算频谱图的值[JOSNWARP来算能量]
     float omega = sqrt(9.81 * kLength);//角频率[既定公式不用管]
     
-    float baseEnergy = jonswap(omega,windSpeed,fetch,gamma);//当前海浪基础能量
+    float baseEnergy = jonswap(omega,pc.windSpeed,pc.fetch,pc.gamma);//当前海浪基础能量
     float finalEnergy = baseEnergy * directionFactor * deltaK * deltaK;//加上风的影响
 
 
     //高频衰减
-    const float highFrequencyCutoff = 2.0;
-
     float highFrequencyFade =
         exp(
             -pow(
-                kLength / highFrequencyCutoff,
+                kLength / pc.highFrequencyCutoff,
                 4.0
             )
         );
@@ -124,7 +142,7 @@ void main() {
     float ifftScale =
         float(pc.resolution) *
         float(pc.resolution) *
-        0.46;
+        pc.amplitudeScale;
 
     // 256² × 0.46 ≈ 30146
     vec2 h0 =

@@ -29,7 +29,9 @@ namespace evolution {
 
 		Evolution(const Evolution&) = delete;
 		Evolution& operator=(const Evolution&) = delete;
-
+		VkImageView getHtSpectrumView() const {
+			return htSpectrumImageView;
+		}
 		// 每帧录制；必须在 IFFT 和海洋绘制之前调用
 		void recordEvolutionCommands(VkCommandBuffer commandBuffer, float time);
 

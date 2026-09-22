@@ -7,15 +7,11 @@ namespace ifft {
 
 	IFFT::IFFT(
 		lve::LveDevice& lveDevice,
-		const evolution::Evolution& evolution,
+		VkImageView inputSpectrumImageView,
 		const std::string& shaderPath,
-		uint32_t resolution)
+		uint32_t resolution
+	)
 		: lveDevice{ lveDevice } {
-
-		if (resolution == 0 || (resolution & (resolution - 1)) != 0) {
-			throw std::runtime_error(
-				"IFFT resolution must be a power of two!");
-		}
 
 		pushConstant.resolution = resolution;
 		pushConstant.stage = 0;
@@ -28,7 +24,9 @@ namespace ifft {
 
 		createDescriptorSetLayout();
 		createDescriptorPool();
-		createDescriptorSets(evolution.getHtSpectrumImageView());
+
+		createDescriptorSets(inputSpectrumImageView);
+
 		createComputePipeline(shaderPath);
 	}
 

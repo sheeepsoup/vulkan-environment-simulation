@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "lve_device.h"
-#include "evolution.h"
+
 
 namespace ifft {
 
@@ -22,7 +22,7 @@ namespace ifft {
 	public:
 		IFFT(
 			lve::LveDevice& lveDevice,
-			const evolution::Evolution& evolution,
+			VkImageView inputSpectrumImageView,
 			const std::string& shaderPath,
 			uint32_t resolution);
 
