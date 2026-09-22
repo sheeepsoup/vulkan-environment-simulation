@@ -327,8 +327,10 @@ namespace lve {
 		float oceanFloor = -8.0f;//海底
 		float landBase = 2.0f;//基础高度
 		const float baseHeight = glm::mix(oceanFloor,landBase,landMask);//对应的海洋地形
-//		const float finalHeight = baseHeight + terrainShape * landMask;
-		const float finalHeight = terrainShape * landMask;
+		//-----------------------------------------------下面二选一,具体功能看注释-------------------------------------------
+		const float finalHeight = baseHeight + terrainShape * landMask;//[海洋生成]
+		//const float finalHeight = terrainShape * landMask;[去掉海洋]
+		//--------------------------------------------------------------------------------------------------------------------
 		return finalHeight + detailValue * detailStrength;
 	}
 	glm::vec3 LveTerrain::calculateNormal(float worldX, float worldY, float sampleDistance) {

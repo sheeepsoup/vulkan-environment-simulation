@@ -132,6 +132,12 @@
     <ClCompile Include="evolution.cpp">
       <Filter>源文件\ocean</Filter>
     </ClCompile>
+    <ClCompile Include="ifft.cpp">
+      <Filter>源文件\ocean</Filter>
+    </ClCompile>
+    <ClCompile Include="displacement.cpp">
+      <Filter>源文件\ocean</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="imgui\imconfig.h">
@@ -200,6 +206,12 @@
     <ClInclude Include="evolution.h">
       <Filter>头文件\ocean</Filter>
     </ClInclude>
+    <ClInclude Include="ifft.h">
+      <Filter>头文件\ocean</Filter>
+    </ClInclude>
+    <ClInclude Include="displacement.h">
+      <Filter>头文件\ocean</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="compile.bat">
@@ -223,8 +235,18 @@
     <None Include="shader\shadow.vert">
       <Filter>资源文件\shader\main</Filter>
     </None>
-    <None Include="evolution.comp">
+    <None Include="shader\evolution.comp">
       <Filter>资源文件\shader\ocean</Filter>
     </None>
+    <None Include="shader\ifft.comp">
+      <Filter>资源文件\shader\ocean</Filter>
+    </None>
+    <None Include="shader\ocean.frag">
+      <Filter>资源文件\shader\ocean</Filter>
+    </None>
+    <None Include="shader\ocean.vert">
+      <Filter>资源文件\shader\ocean</Filter>
+    </None>
+    <None Include="displacement.comp" />
   </ItemGroup>
 </Project>

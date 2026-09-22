@@ -1,0 +1,188 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(binding = 0, rg32f) uniform readonly image2D inputSpectrum;
+layout(binding = 1, rg32f) uniform writeonly image2D outputSpectrum;
+
+layout(push_constant) uniform IFFTPushConstant {
+    uint resolution;//频谱图分辨率
+    uint stage;//第几轮butterfly合并
+    uint axis;//处理方向 0为x方向,1为y方向
+    uint padding;//单纯保证这个push_contant内存是16稳定
+} pc;
+const float PI = 3.14159265;
+
+//复数乘法函数
+vec2 complexMultiply(vec2 a, vec2 b) {
+    return vec2(
+        a.x * b.x - a.y * b.y,
+        a.x * b.y + a.y * b.x
+    );
+}
+uint getBitCount(uint resolution) {
+    uint bitCount = 0u;
+
+    while (resolution > 1u) {
+        resolution >>= 1u;
+        bitCount++;
+    }
+
+    return bitCount;
+}
+
+uint reverseBits(
+    uint value,
+    uint bitCount) {
+
+    uint result = 0u;
+
+    for (uint i = 0u; i < bitCount; i++) {
+        result = (result << 1u) | (value & 1u);
+        value >>= 1u;
+    }
+
+    return result;
+}
+void main(){
+    uvec2 pixel = gl_GlobalInvocationID.xy;
+
+    if (pixel.x >= pc.resolution || pixel.y >= pc.resolution) {
+        return;
+    }
+  // 当前线程在“本次处理方向”上的坐标
+    // 横向 axis = 0 时看 x
+    // 纵向 axis = 1 时看 y
+    uint currentIndex;
+
+    if (pc.axis == 0) {
+        currentIndex = pixel.x;
+    }
+    else {
+        currentIndex = pixel.y;
+    }
+
+    // 当前 stage 配对距离
+    // stage 0: 距离 1
+    // stage 1: 距离 2
+    // stage 2: 距离 4
+    uint pairDistance = 1u << pc.stage;
+
+    // 一个 butterfly 大组的长度
+    // stage 0: 每 2 个点一组
+    // stage 1: 每 4 个点一组
+    // stage 2: 每 8 个点一组
+    uint groupSize = pairDistance * 2u;
+
+    // 当前像素在自己所属大组中的位置
+    uint positionInGroup = currentIndex % groupSize;
+
+    // 当前像素在一对 butterfly 中的偏移
+    uint positionInPair = positionInGroup % pairDistance;
+
+    // 这一对数据的第一个、第二个索引
+    uint firstIndex =
+        currentIndex - positionInGroup + positionInPair;
+
+    uint secondIndex =
+        firstIndex + pairDistance;
+
+    // 当前线程负责写这一对结果中的哪一个
+    bool writeSecondResult =
+        positionInGroup >= pairDistance;
+
+    // 把一维索引还原成二维图像坐标
+    ivec2 firstPixel = ivec2(pixel);
+    ivec2 secondPixel = ivec2(pixel);
+
+    if (pc.axis == 0) {
+        // 横向：y 不变，只改变 x
+        firstPixel.x = int(firstIndex);
+        secondPixel.x = int(secondIndex);
+    }
+    else {
+        // 纵向：x 不变，只改变 y
+        firstPixel.y = int(firstIndex);
+        secondPixel.y = int(secondIndex);
+    }
+    // 只在每个方向的第 0 个 stage 整理输入顺序
+    if (pc.stage == 0u) {
+        uint bitCount = getBitCount(pc.resolution);
+
+        if (pc.axis == 0u) {
+            // 横向：整理 x，y 保持原样
+            firstPixel.x = int(
+                (reverseBits(firstIndex, bitCount) +
+                pc.resolution / 2u) %
+                pc.resolution
+            );
+
+            secondPixel.x = int(
+                (reverseBits(secondIndex, bitCount) +
+                pc.resolution / 2u) %
+                pc.resolution
+            );
+        }
+        else {
+            // 纵向：整理 y，x 保持原样
+            firstPixel.y = int(
+                (reverseBits(firstIndex, bitCount) +
+                pc.resolution / 2u) %
+                pc.resolution
+            );
+
+            secondPixel.y = int(
+                (reverseBits(secondIndex, bitCount) +
+                pc.resolution / 2u) %
+                pc.resolution
+            );
+        }
+    }
+    // 读取这一对旧数据
+    vec2 firstValue =
+        imageLoad(inputSpectrum, firstPixel).rg;
+
+    vec2 secondValue =
+        imageLoad(inputSpectrum, secondPixel).rg;
+
+    // 当前这对数据需要使用的旋转系数
+    float angle =
+        2.0 * PI *
+        float(positionInPair) /
+        float(groupSize);
+
+    vec2 twiddle = vec2(
+        cos(angle),
+        sin(angle)
+    );
+
+    // W × 第二个值
+    vec2 rotatedSecond =
+        complexMultiply(twiddle, secondValue);
+
+    // 一对输入得到一对输出
+    vec2 result;
+
+    if (writeSecondResult) {
+        result = firstValue - rotatedSecond;
+    }
+    else {
+        result = firstValue + rotatedSecond;
+    }
+    uint stageCount = getBitCount(pc.resolution);
+
+    if (pc.axis == 1u && pc.stage == stageCount - 1u) {
+        float normalization =
+            float(pc.resolution) *
+            float(pc.resolution);
+
+        result /= normalization;
+    }
+    // 当前线程只写自己的像素位置
+    imageStore(
+        outputSpectrum,
+        ivec2(pixel),
+        vec4(result, 0.0, 0.0)
+    );
+
+}

@@ -1,4 +1,4 @@
-﻿#version 450
+#version 450
 layout(local_size_x = 16, local_size_y = 16) in;
 layout(binding = 0, rg32f) uniform readonly image2D h0Spectrum;//从specturm得到的海浪初始图
 layout(binding = 1, rg32f) uniform writeonly image2D htSpectrum;//输出的海浪演变图

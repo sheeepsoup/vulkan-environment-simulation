@@ -152,7 +152,9 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="displacement.cpp" />
     <ClCompile Include="evolution.cpp" />
+    <ClCompile Include="ifft.cpp" />
     <ClCompile Include="imgui\imgui.cpp" />
     <ClCompile Include="imgui\imgui_demo.cpp" />
     <ClCompile Include="imgui\imgui_draw.cpp" />
@@ -180,7 +182,9 @@
     <ClCompile Include="shadow.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="displacement.h" />
     <ClInclude Include="evolution.h" />
+    <ClInclude Include="ifft.h" />
     <ClInclude Include="imgui\imconfig.h" />
     <ClInclude Include="imgui\imgui.h" />
     <ClInclude Include="imgui\imgui_impl_sdl3.h" />
@@ -205,8 +209,12 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="compile.bat" />
-    <None Include="evolution.comp" />
+    <None Include="displacement.comp" />
     <None Include="shader\compute.comp" />
+    <None Include="shader\evolution.comp" />
+    <None Include="shader\ifft.comp" />
+    <None Include="shader\ocean.frag" />
+    <None Include="shader\ocean.vert" />
     <None Include="shader\shadow.vert" />
     <None Include="shader\simple_shader.frag" />
     <None Include="shader\simple_shader.vert" />

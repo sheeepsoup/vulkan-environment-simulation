@@ -3,7 +3,7 @@
 待理解:
 shadow的计算和构建数学原理
 spectrum.comp里evlution的数学原理
-
+ifft.comp的butterfly算法自己优化重构一下
 */
 
 
@@ -28,6 +28,8 @@ spectrum.comp里evlution的数学原理
 #include "slope.h"
 #include "shadow.h"
 #include"evolution.h"
+#include"ocean.h"
+#include"ifft.h"
 #include <set>
 #include<vector>
 #include <memory>
@@ -43,8 +45,12 @@ const float cameraMaxSeeDistance = 450.0f;
 glm::vec3 lightDir = glm::normalize(glm::vec3(0.137f, -0.33f, 0.0066f));//光源方向
 const int   g_terrainScale = 2;//地形缩放大小
 
-const int reslution = 256;//频谱图分辨率
-const int oceanRange = 200;//海洋范围,单位米
+const uint32_t spectrumResolution = 256;//频谱图分辨率
+const uint32_t oceanMeshResolution =spectrumResolution + 1; //海洋mesh分辨率
+
+const float spectrumRange = 200.0f;//频谱图范围
+const float oceanMeshRange = 200.0f;//海洋mesh范围
+float oceanHeight = 1.0f;//海浪高度,越高越明显
 //----------------------------------------------------------------------------------------
 //本地无限地形生成开关
 bool unlimitedArea = false;
@@ -64,7 +70,8 @@ shadow::Shadow shadowObj(device, "shader/shadow.vert.spv");
 slope::Slope slopeCompute(device, "shader/slope.comp.spv");
 std::unique_ptr<evolution::Evolution> evolutionObj;//与下同   [海水演变的类]
 std::unique_ptr<spectrum::Spectrum> spectrumObj;//构造在下面main海水部分里面,防止device未初始化报错   [海水海浪频谱图生成]
-
+std::unique_ptr<ifft::IFFT> ifftObj;//ifft生成海浪高度图
+std::unique_ptr<ocean::Ocean> oceanObj;//海洋
 
 uint32_t currentFrame = 0;//当前帧
 
@@ -239,7 +246,7 @@ void regenerateTerrain(int newSeed) {
 	terrain.calculateNormal();
 
 	// 4. 生成海洋 + 缩放
-	terrain.processOcean();
+	//terrain.processOcean();[改成ifft新管线了]
 	terrain.SetModelSize(2);
 
 	// 5. 重新上传顶点缓冲
@@ -262,13 +269,17 @@ void clean() {
 	ImGui_ImplSDL3_Shutdown();
 	ImGui::DestroyContext();
 	shadowObj.clean();
+	oceanObj.reset();
+	ifftObj.reset();
+	evolutionObj.reset();
+	spectrumObj->clean();
+	spectrumObj.reset();
 	renderPass.clean(device.getDevice());
 	renderer.clean(device.getDevice());
 	win.cleanSurface(device.getInstance());
 	model.clean(device.getDevice());
 	compute.clean();
 	slopeCompute.clean();
-	spectrumObj->clean();
 	uniform.clean(device.getDevice(),renderer.getMaxFramesInFlight());
 	auto vkDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(device.getInstance(), "vkDestroyDebugUtilsMessengerEXT");
 	if (vkDestroyDebugUtilsMessengerEXT) {
@@ -461,10 +472,12 @@ int main() {
 		<< " seconds\n";
 
 	//生成海洋-------------------------------------------------------------------------------------------------------------
-	spectrumObj = std::make_unique<spectrum::Spectrum>(device,"shader/spectrum.comp.spv", reslution,oceanRange);//这构造,防止上面未初始化device报错
+	spectrumObj = std::make_unique<spectrum::Spectrum>(device,"shader/spectrum.comp.spv", spectrumResolution,spectrumRange);//这构造,防止上面未初始化device报错
 	spectrumObj->generateInitialSpectrum();//创建频谱图,[路径][分辨率]
-	evolutionObj = std::make_unique<evolution::Evolution>(device,*spectrumObj,"shader/evolution.comp.spv",reslution,oceanRange);//海水演变
-	terrain.processOcean();
+	evolutionObj = std::make_unique<evolution::Evolution>(device,*spectrumObj,"shader/evolution.comp.spv",spectrumResolution,spectrumRange);//海水演变
+	ifftObj = std::make_unique<ifft::IFFT>(device,*evolutionObj,"shader/ifft.comp.spv",spectrumResolution);
+
+	//terrain.processOcean();[改成新管线的了]
 	//-------------------------------------------------------------------------------------------------------------
 	//放大地形
 	terrain.SetModelSize(g_terrainScale);
@@ -486,6 +499,18 @@ int main() {
 
 
 	renderPass.createRenderPass(swapChain.getSwapChainSurfaceFormat(), device.findDepthFormat(),device.getDevice());//创建渲染通道
+
+	oceanObj = std::make_unique<ocean::Ocean>(
+		device,
+		*ifftObj,
+		renderPass.getRenderPass(),
+		uniform.getDescriptorSetLayout(),
+		"shader/ocean.vert.spv",
+		"shader/ocean.frag.spv",
+		oceanMeshResolution,
+		oceanMeshRange
+	);//海洋渲染构造
+
 	//初始化imgui
 	initImGui();
 
@@ -669,12 +694,11 @@ int main() {
 			glm::vec3(0.0f, 0.0f, 0.0f),
 			800.0f);
 
-
-		evolutionObj.recordEvolutionCommands(commandBuffer, time);//海洋波浪演化
+	
 		renderer.run(device.getDevice(), swapChain, device.getGraphicsQueue(), device.getPresentQueue(),
 			currentFrame, renderPass.getRenderPass(),model,uniform.getDescriptorSets(),pipeLine.getPipelineLayout(),
 			uniform, modelMatrix,camera.getView(),camera.getProjection(),compute,camera.getPos(),terrain.getIndices(),terrain, cameraMaxSeeDistance, shadowObj,
-			lightViewProj, glm::vec4(bias, lightDir));
+			lightViewProj, glm::vec4(bias, lightDir), *evolutionObj, static_cast<float>(currentTime) / 1000.0f,*ifftObj,*oceanObj,oceanHeight);
 		
 		if (g_rerunErosion) {
 			g_rerunErosion = false;

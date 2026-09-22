@@ -1,4 +1,4 @@
-﻿#version 450
+#version 450
 
 layout(local_size_x = 16, local_size_y = 16) in;
 
@@ -12,12 +12,12 @@ layout(push_constant) uniform SpectrumPushConstant {
 
 
 const float PI = 3.14159265;
-vec2 windDirection = vec2(1.0f, 0.3f);//风向[后面塞到push_contant里面]
+vec2 windDirection = vec2(0.9578, 0.2873);//风向[后面塞到push_contant里面]
 float windSpeed = 12.0f;//风速[后面塞到push_content里面]
 float fetch = 10000.0f;//风区长度[后面塞到push_content里面](风在海面吹过的距离,越小海浪越年轻)
 float gamma = 3.3f;//主浪峰的峰尖长度
 
-const float normalizeContent = 4.0;//风向集中程度,越大顺风的浪越明显
+const float normalizeContent = 6.0;//风向集中程度,越大顺风的浪越明显
 
 //计算频谱图的值[JOSNWARP来算能量]
 float jonswap(float omega,float windSpeed,float fetch,float gamma) {
@@ -100,10 +100,37 @@ void main() {
     
     float baseEnergy = jonswap(omega,windSpeed,fetch,gamma);//当前海浪基础能量
     float finalEnergy = baseEnergy * directionFactor * deltaK * deltaK;//加上风的影响
+
+
+    //高频衰减
+    const float highFrequencyCutoff = 2.0;
+
+    float highFrequencyFade =
+        exp(
+            -pow(
+                kLength / highFrequencyCutoff,
+                4.0
+            )
+        );
+
+    finalEnergy *= highFrequencyFade;
+
     //finalEnergy = clamp(finalEnergy * 10000.0, 0.0, 1.0);//单纯debug测试用
     //能量算完了加点随机*---------------------------------------------------------------------------------------------------------------------
     vec2 randomComplex = gaussianRandom(pixel);//获取2个随机数
     float amplitude = sqrt(max(finalEnergy, 0.0) * 0.5);//缩放系数,防止能量白算
-    vec2 h0 = randomComplex * amplitude;//[坐标]波的方向(x,y)和能量(length)[R]复数实部 [G]复数虚部
+    // 你的 IFFT 最后一轮除以 resolution²。
+    // 这里把频谱幅度补回来，避免渲染端写 30500。
+    float ifftScale =
+        float(pc.resolution) *
+        float(pc.resolution) *
+        0.46;
+
+    // 256² × 0.46 ≈ 30146
+    vec2 h0 =
+        randomComplex *
+        amplitude *
+        ifftScale;//[坐标]波的方向(x,y)和能量(length)[R]复数实部 [G]复数虚部
+    //vec2 h0 = randomComplex * amplitude;
     imageStore(h0Spectrum,ivec2(pixel),vec4(h0, 0.0, 0.0));
 }
