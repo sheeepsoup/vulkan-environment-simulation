@@ -173,6 +173,7 @@
     <ClCompile Include="lve_renderPass.h" />
     <ClCompile Include="lve_swapChain.cpp" />
     <ClCompile Include="ocean.cpp" />
+    <ClCompile Include="oceanCascade.cpp" />
     <ClCompile Include="slope.cpp" />
     <ClCompile Include="spectrum.cpp" />
     <ClCompile Include="terrain.cpp" />
@@ -203,6 +204,7 @@
     <ClInclude Include="lve_windows.h" />
     <ClInclude Include="lve_terrain.h" />
     <ClInclude Include="ocean.h" />
+    <ClInclude Include="oceanCascade.h" />
     <ClInclude Include="shadow.h" />
     <ClInclude Include="slope.h" />
     <ClInclude Include="spectrum.h" />

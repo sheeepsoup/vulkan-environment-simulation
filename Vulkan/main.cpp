@@ -74,13 +74,11 @@ lve::LveCompute compute(device, "shader/compute.comp.spv");
 lve::LveTerrain terrain;
 shadow::Shadow shadowObj(device, "shader/shadow.vert.spv");
 slope::Slope slopeCompute(device, "shader/slope.comp.spv");
-std::unique_ptr<evolution::Evolution> evolutionObj;//与下同   [海水演变的类]
-std::unique_ptr<spectrum::Spectrum> spectrumObj;//构造在下面main海水部分里面,防止device未初始化报错   [海水海浪频谱图生成]
-std::unique_ptr<ifft::IFFT> ifftObj;//ifft生成海浪高度图
-std::unique_ptr<ocean::Ocean> oceanObj;//海洋
-std::unique_ptr<displacement::Displacement>displacementObj;
-std::unique_ptr<ifft::IFFT>displacementXIFFTObj;
-std::unique_ptr<ifft::IFFT>displacementYIFFTObj;
+std::unique_ptr<ocean::Ocean> oceanObj;//海洋对象
+std::unique_ptr<ocean_cascade::OceanCascade> bigOceanCascade;//大海洋级联
+std::unique_ptr<ocean_cascade::OceanCascade> middleOceanCascade;//中海洋级联
+std::unique_ptr<ocean_cascade::OceanCascade> smallOceanCascade;//小海洋级联
+std::unique_ptr<ocean_cascade::OceanCascade> tinyOceanCascade;//微海洋级联
 
 uint32_t currentFrame = 0;//当前帧
 
@@ -279,13 +277,11 @@ void clean() {
 	ImGui::DestroyContext();
 	shadowObj.clean();
 	oceanObj.reset();
-	displacementYIFFTObj.reset();
-	displacementXIFFTObj.reset();
-	displacementObj.reset();
-	ifftObj.reset();
-	evolutionObj.reset();
-	spectrumObj->clean();
-	spectrumObj.reset();
+
+	tinyOceanCascade.reset();
+	smallOceanCascade.reset();
+	middleOceanCascade.reset();
+	bigOceanCascade.reset();
 	renderPass.clean(device.getDevice());
 	renderer.clean(device.getDevice());
 	win.cleanSurface(device.getInstance());
@@ -484,13 +480,62 @@ int main() {
 		<< " seconds\n";
 
 	//生成海洋-------------------------------------------------------------------------------------------------------------
-	spectrumObj = std::make_unique<spectrum::Spectrum>(device,"shader/spectrum.comp.spv", spectrumResolution,spectrumRange);//这构造,防止上面未初始化device报错
-	spectrumObj->generateInitialSpectrum(oceanSpectrumSettings);//创建频谱图,[路径][分辨率]
-	evolutionObj = std::make_unique<evolution::Evolution>(device,*spectrumObj,"shader/evolution.comp.spv",spectrumResolution,spectrumRange);//海水演变
-	ifftObj = std::make_unique<ifft::IFFT>(device,evolutionObj->getHtSpectrumImageView(),"shader/ifft.comp.spv",spectrumResolution);
-	displacementObj =std::make_unique<displacement::Displacement>(device,*evolutionObj,"shader/displacement.comp.spv",spectrumResolution,static_cast<uint32_t>(spectrumRange));
-	displacementXIFFTObj =std::make_unique<ifft::IFFT>(device,displacementObj->getDisplacementXView(),"shader/ifft.comp.spv",spectrumResolution);
-	displacementYIFFTObj =std::make_unique<ifft::IFFT>(device,displacementObj->getDisplacementYView(),"shader/ifft.comp.spv",spectrumResolution);
+	bigOceanCascade =
+		std::make_unique<ocean_cascade::OceanCascade>(
+			device,
+			200,
+			1.00f,
+			spectrumResolution,
+			"shader/spectrum.comp.spv",
+			"shader/evolution.comp.spv",
+			"shader/displacement.comp.spv",
+			"shader/ifft.comp.spv",
+			0.25f
+		);
+
+	middleOceanCascade =
+		std::make_unique<ocean_cascade::OceanCascade>(
+			device,
+			50,
+			0.45f,
+			spectrumResolution,
+			"shader/spectrum.comp.spv",
+			"shader/evolution.comp.spv",
+			"shader/displacement.comp.spv",
+			"shader/ifft.comp.spv",
+			0.55f
+		);
+
+	smallOceanCascade =
+		std::make_unique<ocean_cascade::OceanCascade>(
+			device,
+			12,
+			0.18f,
+			spectrumResolution,
+			"shader/spectrum.comp.spv",
+			"shader/evolution.comp.spv",
+			"shader/displacement.comp.spv",
+			"shader/ifft.comp.spv",
+			0.80f
+		);
+
+	tinyOceanCascade =
+		std::make_unique<ocean_cascade::OceanCascade>(
+			device,
+			3,
+			0.06f,
+			spectrumResolution,
+			"shader/spectrum.comp.spv",
+			"shader/evolution.comp.spv",
+			"shader/displacement.comp.spv",
+			"shader/ifft.comp.spv",
+			0.30f
+		);
+
+	bigOceanCascade->generateInitialSpectrum(oceanSpectrumSettings);
+	middleOceanCascade->generateInitialSpectrum(oceanSpectrumSettings);
+	smallOceanCascade->generateInitialSpectrum(oceanSpectrumSettings);
+	tinyOceanCascade->generateInitialSpectrum(oceanSpectrumSettings);
 	//terrain.processOcean();[改成新管线的了]
 	//-------------------------------------------------------------------------------------------------------------
 	//放大地形
@@ -516,9 +561,10 @@ int main() {
 
 	oceanObj = std::make_unique<ocean::Ocean>(
 		device,
-		*ifftObj,
-		*displacementXIFFTObj,
-		*displacementYIFFTObj,
+		*bigOceanCascade,
+		*middleOceanCascade,
+		*smallOceanCascade,
+		*tinyOceanCascade,
 		renderPass.getRenderPass(),
 		uniform.getDescriptorSetLayout(),
 		"shader/ocean.vert.spv",
@@ -751,14 +797,20 @@ int main() {
 		renderer.run(device.getDevice(), swapChain, device.getGraphicsQueue(), device.getPresentQueue(),
 			currentFrame, renderPass.getRenderPass(),model,uniform.getDescriptorSets(),pipeLine.getPipelineLayout(),
 			uniform, modelMatrix,camera.getView(),camera.getProjection(),compute,camera.getPos(),terrain.getIndices(),terrain, cameraMaxSeeDistance, shadowObj,
-			lightViewProj, glm::vec4(bias, lightDir), *evolutionObj, static_cast<float>(currentTime) / 1000.0f * oceanTimeScale,*ifftObj,*oceanObj,oceanHeight, *displacementObj,
-			*displacementXIFFTObj,*displacementYIFFTObj, horizontal_displacement_intensity,oceanChoppiness);
+			lightViewProj, glm::vec4(bias, lightDir), static_cast<float>(currentTime) / 1000.0f * oceanTimeScale,*oceanObj,oceanHeight, horizontal_displacement_intensity,
+			*bigOceanCascade, *middleOceanCascade, *smallOceanCascade, *tinyOceanCascade
+		);
 
 		// 频谱图被当前帧读取过后才允许覆盖它；只会在点击按钮时短暂停一次。
 		if (g_regenerateOceanSpectrum) {
 			g_regenerateOceanSpectrum = false;
+
 			vkDeviceWaitIdle(device.getDevice());
-			spectrumObj->generateInitialSpectrum(oceanSpectrumSettings);
+
+			bigOceanCascade->generateInitialSpectrum(oceanSpectrumSettings);
+			middleOceanCascade->generateInitialSpectrum(oceanSpectrumSettings);
+			smallOceanCascade->generateInitialSpectrum(oceanSpectrumSettings);
+			tinyOceanCascade->generateInitialSpectrum(oceanSpectrumSettings);
 		}
 		
 		if (g_rerunErosion) {

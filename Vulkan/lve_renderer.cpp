@@ -62,9 +62,9 @@ namespace lve {
 	void LveRenderer::run(VkDevice device, LveSwapChain& swapChain, VkQueue graphicsQueue, VkQueue presentQueue, uint32_t& currentFrame,
 		VkRenderPass &renderPass, LveModel& model,const std::vector<VkDescriptorSet> descriptorSets, VkPipelineLayout pipelineLayout,LveUniform &uniform,
 		const glm::mat4 modelMatirx,const glm::mat4 view,const glm::mat4 proj,LveCompute& compute,glm::vec3 cameraPos, std::vector<uint32_t>& indices,
-		LveTerrain& terrain, float renderDistance, shadow::Shadow& shadow, const glm::mat4& lightViewProj,glm::vec4 renderParams, evolution::Evolution& evolutionObj,
-		float time, ifft::IFFT& ifftObj, ocean::Ocean &oceanObj, float oceanHeight, displacement::Displacement& displacementObj, ifft::IFFT& displacementXIFFTObj,
-		ifft::IFFT& displacementYIFFTObj, float horizontal_displacement_intensity,float oceanChoppiness) {
+		LveTerrain& terrain, float renderDistance, shadow::Shadow& shadow, const glm::mat4& lightViewProj,glm::vec4 renderParams, 
+		float time, ocean::Ocean& oceanObj, float oceanHeight, float horizontal_displacement_intensity, ocean_cascade::OceanCascade& bigOceanCascade,
+		ocean_cascade::OceanCascade& middleOceanCascade, ocean_cascade::OceanCascade& smallOceanCascade, ocean_cascade::OceanCascade& tinyOceanCascade) {
 		vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);//等待栅栏,直到渲染完成
 		vkAcquireNextImageKHR(device, swapChain.getSwapChain(), UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);//获取下一张交换链图片的索引,并将imageAvailableSemaphore信号量设置为在图像可用时发出信号
 		vkResetFences(device, 1, &inFlightFences[currentFrame]);//重置栅栏,以便下一次使用
@@ -74,8 +74,8 @@ namespace lve {
 		vkResetCommandBuffer(commandBuffers[currentFrame], 0);//重置命令缓冲区,以便重新记录命令缓冲区
 		recordCommandBuffer(commandBuffers[currentFrame], imageIndex,
 			renderPass,swapChain.getSwapChainFrameBuffer(imageIndex),swapChain.getSwapChainExtent(),model,pipelineLayout,currentFrame,descriptorSets,compute,
-			indices,terrain,renderDistance,cameraPos, shadow, lightViewProj,evolutionObj,time, ifftObj,oceanObj,oceanHeight,displacementObj, displacementXIFFTObj,
-			displacementYIFFTObj, horizontal_displacement_intensity,oceanChoppiness);//记录命令缓冲区
+			indices,terrain,renderDistance,cameraPos, shadow, lightViewProj,time,oceanObj, oceanHeight,horizontal_displacement_intensity, bigOceanCascade,
+			middleOceanCascade, smallOceanCascade, tinyOceanCascade);//记录命令缓冲区
 
 		//提交命令缓冲区
 		VkSubmitInfo submitInfo{};//提交信息
@@ -117,9 +117,9 @@ namespace lve {
 	void LveRenderer::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, VkRenderPass renderPass,
 		VkFramebuffer framebuffer, VkExtent2D extent, LveModel& model, VkPipelineLayout pipelineLayout, uint32_t currentFrame,
 		const std::vector<VkDescriptorSet> descriptorSets, LveCompute& compute, std::vector<uint32_t>& indices, LveTerrain& terrain,
-		float renderDistance, glm::vec3 cameraPos, shadow::Shadow& shadow, const glm::mat4& lightViewProj, evolution::Evolution& evolutionObj,
-		float time,ifft::IFFT &ifftObj,ocean::Ocean &oceanObj,float oceanHeight,displacement::Displacement &displacementObj,ifft::IFFT &displacementXIFFTObj,
-		ifft::IFFT &displacementYIFFTObj,float horizontal_displacement_intensity,float oceanChoppiness) {
+		float renderDistance, glm::vec3 cameraPos, shadow::Shadow& shadow, const glm::mat4& lightViewProj,
+		float time,ocean::Ocean &oceanObj,float oceanHeight,float horizontal_displacement_intensity, ocean_cascade::OceanCascade& bigOceanCascade, 
+		ocean_cascade::OceanCascade& middleOceanCascade, ocean_cascade::OceanCascade& smallOceanCascade, ocean_cascade::OceanCascade& tinyOceanCascade) {
 		{
 			VkCommandBufferBeginInfo beginInfo{};
 			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;//~
@@ -130,20 +130,12 @@ namespace lve {
 				throw std::runtime_error("failed to begin recording command buffer!");
 			}
 		
-			evolutionObj.recordEvolutionCommands(commandBuffer, time);//海洋波浪演化
-			displacementObj.recordDisplacementCommands(
-				commandBuffer,
-				oceanChoppiness // choppiness，先从 0.8 ~ 1.2 测
-			);//海洋位移计算
+			bigOceanCascade.update(commandBuffer, time);
+			middleOceanCascade.update(commandBuffer, time);
+			smallOceanCascade.update(commandBuffer, time);
+			tinyOceanCascade.update(commandBuffer, time);
 
-
-			ifftObj.recordIFFTCommands(commandBuffer);//ifft计算[高度的]
-			//下面是计算水平位移的,来改变海浪顶点的水平坐标
-			// 新增：Dx -> X 位移图
-			displacementXIFFTObj.recordIFFTCommands(commandBuffer);
-
-			// 新增：Dy -> Y 位移图
-			displacementYIFFTObj.recordIFFTCommands(commandBuffer);
+			oceanObj.recordHeightMapReadyForGraphics(commandBuffer);
 
 			oceanObj.recordHeightMapReadyForGraphics(commandBuffer);//将ifft计算结果传给graphics绘画海洋
 			//记录阴影的渲染通道

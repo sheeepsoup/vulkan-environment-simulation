@@ -11,6 +11,7 @@
 #include"lve_terrain.h"
 #include"evolution.h"
 #include"displacement.h"
+#include"oceanCascade.h"
 #include"ifft.h"
 #include"ocean.h"
 #include "shadow.h"
@@ -25,11 +26,11 @@ namespace lve {
 		* 
 		*/
 		void run(VkDevice device, LveSwapChain& swapChain, VkQueue graphicsQueue, VkQueue presentQueue, uint32_t& currentFrame,
-			VkRenderPass &renderPass, LveModel& model, const std::vector<VkDescriptorSet> descriptorSets, VkPipelineLayout pipelineLayout, LveUniform &uniform,
+			VkRenderPass& renderPass, LveModel& model, const std::vector<VkDescriptorSet> descriptorSets, VkPipelineLayout pipelineLayout, LveUniform& uniform,
 			const glm::mat4 modelMatirx, const glm::mat4 view, const glm::mat4 proj, LveCompute& compute, glm::vec3 cameraPos, std::vector<uint32_t>& indices,
-			LveTerrain& terrain,float renderDistance, shadow::Shadow& shadow, const glm::mat4& lightViewProj, glm::vec4 renderParams, evolution::Evolution& evolutionObj,
-			float time, ifft::IFFT& ifftObj, ocean::Ocean &oceanObj, float oceanHeight, displacement::Displacement& displacementObj, ifft::IFFT& displacementXIFFTObj,
-			ifft::IFFT& displacementYIFFTObj, float horizontal_displacement_intensity,float oceanChoppiness);
+			LveTerrain& terrain, float renderDistance, shadow::Shadow& shadow, const glm::mat4& lightViewProj, glm::vec4 renderParams,
+			float time, ocean::Ocean& oceanObj, float oceanHeight, float horizontal_displacement_intensity, ocean_cascade::OceanCascade& bigOceanCascade,
+			ocean_cascade::OceanCascade& middleOceanCascade, ocean_cascade::OceanCascade& smallOceanCascade, ocean_cascade::OceanCascade& tinyOceanCascade);
 		uint32_t getImageIndex() { return imageIndex; };
 		uint32_t getMaxFramesInFlight() { return MAX_FRAMES_IN_FLIGHT; };
 		void clean(VkDevice device);
@@ -47,9 +48,9 @@ namespace lve {
 		void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex, VkRenderPass renderPass,
 			VkFramebuffer framebuffer, VkExtent2D extent, LveModel& model, VkPipelineLayout pipelineLayout, uint32_t currentFrame,
 			const std::vector<VkDescriptorSet> descriptorSets, LveCompute& compute, std::vector<uint32_t>& indices, LveTerrain& terrain,
-			float renderDistance, glm::vec3 cameraPos, shadow::Shadow& shadow, const glm::mat4& lightViewProj, evolution::Evolution& evolutionObj,
-			float time, ifft::IFFT& ifftObj, ocean::Ocean &	oceanObj,float oceanHeight, displacement::Displacement& displacementObj, ifft::IFFT& displacementXIFFTObj,
-			ifft::IFFT& displacementYIFFTObj, float horizontal_displacement_intensity,float oceanChoppiness);
+			float renderDistance, glm::vec3 cameraPos, shadow::Shadow& shadow, const glm::mat4& lightViewProj,
+			float time, ocean::Ocean& oceanObj, float oceanHeight, float horizontal_displacement_intensity, ocean_cascade::OceanCascade& bigOceanCascade,
+			ocean_cascade::OceanCascade& middleOceanCascade, ocean_cascade::OceanCascade& smallOceanCascade, ocean_cascade::OceanCascade& tinyOceanCascade);
 	};
 
 }

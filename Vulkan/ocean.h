@@ -5,7 +5,7 @@
 #include <vector>
 
 #include <vulkan/vulkan.h>
-
+#include"oceanCascade.h"
 #include "ifft.h"
 #include "lve_device.h"
 #include "lve_model.h"
@@ -16,16 +16,20 @@ namespace ocean {
 		float oceanRange;
 		float heightScale;
 		float horizontalScale;
-		float padding;
+		float normalSampleStep;
+
+		glm::vec4 cascadeRanges;
+		glm::vec4 cascadeContributions;
 	};
 
 	class Ocean {
 	public:
 		Ocean(
 			lve::LveDevice& lveDevice,
-			const ifft::IFFT& heightIFFT,
-			const ifft::IFFT& displacementXIFFT,
-			const ifft::IFFT& displacementYIFFT,
+			ocean_cascade::OceanCascade& big_oceanCascade,
+			ocean_cascade::OceanCascade& middle_oceanCascade,
+			ocean_cascade::OceanCascade& small_oceanCascade,
+			ocean_cascade::OceanCascade& tiny_oceanCascade,
 			VkRenderPass renderPass,
 			VkDescriptorSetLayout globalDescriptorSetLayout,
 			const std::string& vertexShaderPath,
@@ -56,6 +60,14 @@ namespace ocean {
 		}
 
 	private:
+		static constexpr uint32_t CASCADE_COUNT = 4;//海浪级联数量
+		ocean_cascade::OceanCascade& big_oceanCascade;//大海浪
+		ocean_cascade::OceanCascade& middle_oceanCascade;//中海浪
+		ocean_cascade::OceanCascade& small_oceanCascade;//小海浪
+		ocean_cascade::OceanCascade& tiny_oceanCascade;//微海浪
+
+		lve::LveDevice& lveDevice;
+
 		void createMesh();
 
 		void createHeightMapSampler();
@@ -77,10 +89,7 @@ namespace ocean {
 		VkShaderModule createShaderModule(
 			const std::vector<char>& code) const;
 
-		lve::LveDevice& lveDevice;
-		const ifft::IFFT& heightIFFT;
-		const ifft::IFFT& displacementXIFFT;
-		const ifft::IFFT& displacementYIFFT;
+
 
 		lve::LveModel model;
 

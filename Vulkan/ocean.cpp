@@ -8,9 +8,10 @@ namespace ocean {
 
 	Ocean::Ocean(
 		lve::LveDevice& lveDevice,
-		const ifft::IFFT& heightIFFT,
-		const ifft::IFFT& displacementXIFFT,
-		const ifft::IFFT& displacementYIFFT,
+		ocean_cascade::OceanCascade& big_oceanCascade,
+		ocean_cascade::OceanCascade& middle_oceanCascade,
+		ocean_cascade::OceanCascade& small_oceanCascade,
+		ocean_cascade::OceanCascade& tiny_oceanCascade,
 		VkRenderPass renderPass,
 		VkDescriptorSetLayout globalDescriptorSetLayout,
 		const std::string& vertexShaderPath,
@@ -18,9 +19,10 @@ namespace ocean {
 		uint32_t meshResolution,
 		float oceanRange)
 		: lveDevice{ lveDevice },
-		heightIFFT{ heightIFFT },
-		displacementXIFFT{ displacementXIFFT },
-		displacementYIFFT{ displacementYIFFT },
+		big_oceanCascade{ big_oceanCascade },
+		middle_oceanCascade{ middle_oceanCascade },
+		small_oceanCascade{ small_oceanCascade },
+		tiny_oceanCascade{ tiny_oceanCascade },
 		meshResolution{ meshResolution },
 		oceanRange{ oceanRange } {
 
@@ -211,7 +213,7 @@ namespace ocean {
 			bindings[i].descriptorType =
 				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
-			bindings[i].descriptorCount = 1;
+			bindings[i].descriptorCount = CASCADE_COUNT;
 
 			bindings[i].stageFlags =
 				VK_SHADER_STAGE_VERTEX_BIT |
@@ -244,7 +246,7 @@ namespace ocean {
 		poolSize.type =
 			VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
-		poolSize.descriptorCount = 3;
+		poolSize.descriptorCount = 3 * CASCADE_COUNT;
 
 		VkDescriptorPoolCreateInfo poolInfo{};
 		poolInfo.sType =
@@ -284,45 +286,52 @@ namespace ocean {
 			);
 		}
 
-		VkDescriptorImageInfo imageInfos[3]{};
+		std::array<
+			const ocean_cascade::OceanCascade*,
+			CASCADE_COUNT
+		> cascades = {
+			&big_oceanCascade,
+			&middle_oceanCascade,
+			&small_oceanCascade,
+			&tiny_oceanCascade
+		};
 
-		imageInfos[0].imageLayout =
-			VK_IMAGE_LAYOUT_GENERAL;
-		imageInfos[0].imageView =
-			heightIFFT.getHeightMapImageView();
-		imageInfos[0].sampler =
-			heightMapSampler;
+		std::array<VkDescriptorImageInfo, CASCADE_COUNT> heightInfos{};
+		std::array<VkDescriptorImageInfo, CASCADE_COUNT> dxInfos{};
+		std::array<VkDescriptorImageInfo, CASCADE_COUNT> dyInfos{};
 
-		imageInfos[1].imageLayout =
-			VK_IMAGE_LAYOUT_GENERAL;
-		imageInfos[1].imageView =
-			displacementXIFFT.getHeightMapImageView();
-		imageInfos[1].sampler =
-			heightMapSampler;
+		for (uint32_t i = 0; i < CASCADE_COUNT; ++i) {
+			heightInfos[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+			heightInfos[i].imageView = cascades[i]->getHeightImageView();
+			heightInfos[i].sampler = heightMapSampler;
 
-		imageInfos[2].imageLayout =
-			VK_IMAGE_LAYOUT_GENERAL;
-		imageInfos[2].imageView =
-			displacementYIFFT.getHeightMapImageView();
-		imageInfos[2].sampler =
-			heightMapSampler;
+			dxInfos[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+			dxInfos[i].imageView = cascades[i]->getDisplacementXImageView();
+			dxInfos[i].sampler = heightMapSampler;
+
+			dyInfos[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+			dyInfos[i].imageView = cascades[i]->getDisplacementYImageView();
+			dyInfos[i].sampler = heightMapSampler;
+		}
 
 		std::array<VkWriteDescriptorSet, 3> writes{};
 
-		for (uint32_t i = 0; i < 3; i++) {
-			writes[i].sType =
+		for (uint32_t binding = 0; binding < 3; ++binding) {
+			writes[binding].sType =
 				VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 
-			writes[i].dstSet = descriptorSet;
-			writes[i].dstBinding = i;
-			writes[i].dstArrayElement = 0;
-
-			writes[i].descriptorType =
+			writes[binding].dstSet = descriptorSet;
+			writes[binding].dstBinding = binding;
+			writes[binding].dstArrayElement = 0;
+			writes[binding].descriptorType =
 				VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 
-			writes[i].descriptorCount = 1;
-			writes[i].pImageInfo = &imageInfos[i];
+			writes[binding].descriptorCount = CASCADE_COUNT;
 		}
+
+		writes[0].pImageInfo = heightInfos.data();
+		writes[1].pImageInfo = dxInfos.data();
+		writes[2].pImageInfo = dyInfos.data();
 
 		vkUpdateDescriptorSets(
 			lveDevice.getDevice(),
@@ -549,15 +558,30 @@ namespace ocean {
 	void Ocean::recordHeightMapReadyForGraphics(
 		VkCommandBuffer commandBuffer
 	) const {
-		std::array<VkImage, 3> images = {
-			heightIFFT.getHeightMapImage(),
-			displacementXIFFT.getHeightMapImage(),
-			displacementYIFFT.getHeightMapImage()
+		std::array<
+			const ocean_cascade::OceanCascade*,
+			CASCADE_COUNT
+		> cascades = {
+			&big_oceanCascade,
+			&middle_oceanCascade,
+			&small_oceanCascade,
+			&tiny_oceanCascade
 		};
 
-		std::array<VkImageMemoryBarrier, 3> barriers{};
+		std::array<VkImage, CASCADE_COUNT * 3> images{};
 
-		for (uint32_t i = 0; i < 3; i++) {
+		for (uint32_t i = 0; i < CASCADE_COUNT; ++i) {
+			images[i * 3 + 0] = cascades[i]->getHeightImage();
+			images[i * 3 + 1] = cascades[i]->getDisplacementXImage();
+			images[i * 3 + 2] = cascades[i]->getDisplacementYImage();
+		}
+
+		std::array<
+			VkImageMemoryBarrier,
+			CASCADE_COUNT * 3
+		> barriers{};
+
+		for (uint32_t i = 0; i < CASCADE_COUNT * 3; i++){
 			barriers[i].sType =
 				VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 
@@ -640,6 +664,22 @@ namespace ocean {
 		pushConstant.oceanRange = oceanRange;
 		pushConstant.heightScale = heightScale;
 		pushConstant.horizontalScale = horizontalScale;
+		pushConstant.normalSampleStep =
+			static_cast<float>(middle_oceanCascade.getOceanRange()) / 256.0f;
+
+		pushConstant.cascadeRanges = glm::vec4(
+			static_cast<float>(big_oceanCascade.getOceanRange()),
+			static_cast<float>(middle_oceanCascade.getOceanRange()),
+			static_cast<float>(small_oceanCascade.getOceanRange()),
+			static_cast<float>(tiny_oceanCascade.getOceanRange())
+		);
+
+		pushConstant.cascadeContributions = glm::vec4(
+			big_oceanCascade.getContribution(),
+			middle_oceanCascade.getContribution(),
+			small_oceanCascade.getContribution(),
+			tiny_oceanCascade.getContribution()
+		);
 		vkCmdPushConstants(
 			commandBuffer,
 			pipelineLayout,

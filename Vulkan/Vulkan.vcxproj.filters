@@ -138,6 +138,9 @@
     <ClCompile Include="displacement.cpp">
       <Filter>源文件\ocean</Filter>
     </ClCompile>
+    <ClCompile Include="oceanCascade.cpp">
+      <Filter>源文件\ocean</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="imgui\imconfig.h">
@@ -210,6 +213,9 @@
       <Filter>头文件\ocean</Filter>
     </ClInclude>
     <ClInclude Include="displacement.h">
+      <Filter>头文件\ocean</Filter>
+    </ClInclude>
+    <ClInclude Include="oceanCascade.h">
       <Filter>头文件\ocean</Filter>
     </ClInclude>
   </ItemGroup>
