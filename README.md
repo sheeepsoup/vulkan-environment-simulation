@@ -8,6 +8,15 @@
   <a href="#english">English</a> · <a href="#chinese">中文</a>
 </p>
 
+**⚠️ Project Status / 项目状态**
+
+> **This project is temporarily on hold due to other ongoing project commitments.**
+> **If you're interested in the principles behind any part of it, feel free to reach out via email.**
+>
+> **由于目前参与其他项目的制作，当前项目暂时推迟。**
+> **如果你对其中某个环节的原理感兴趣，请通过邮箱交流。**
+
+
 ---
 
 ## 📸 Gallery
